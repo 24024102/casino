@@ -91,13 +91,13 @@ def get(session):
                     H2(f"Welcome to {hub_name}"),
                     P("Identify yourself to join the table:", style="color: #888;"),
                     Form(
-                        Input(type="text", name="nickname", placeholder="Enter your hacker name...", required=True, style="padding: 10px; width: 80%; margin-bottom: 20px; border-radius: 5px; border: 1px solid #555; background: #222; color: white; font-size: 16px;"),
+                        Input(type="text", name="nickname", placeholder="Enter your hacker name...", required=True, cls="login-input"),
                         Br(),
-                        Button("Join Table", type="submit", style="background: #2b7a2b; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px;"),
+                        Button("JOIN TABLE", type="submit", cls="login-btn"),
                         action="/login", method="post"
                     ),
-                    style="text-align: center; margin: 100px auto; padding: 50px; background: #111; border: 2px solid #333; border-radius: 10px; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);"
-                )
+                    cls="login-container"
+            )
             )
         )
     nickname = session['nickname']
@@ -138,17 +138,13 @@ def get(session):
                   Div(Div("Toxic Senior", style="font-size: 12px; color: #aaa;"), Div("$850", style="font-weight: bold;"), cls="player-seat"),
                 style="display: flex; justify-content: space-around; margin-bottom: 40px; transform: translateY(-30px);"
                 ),
-                
                 Div(
                   Div(f"POT: ${pot}", id="pot-display", style="font-size: 28px; font-weight: bold; color: #d4af37; background: rgba(0,0,0,0.5); padding: 5px 20px; border-radius: 20px; display: inline-block; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);"),
                   Br(),
-                  PokerCard("A", "♠", "black"),
-                  PokerCard("K", "♥", "red"),
-                  PokerCard("10", "♦", "red"),
-              PokerCard("J", "♠", "black"),
-                 PokerCard("Q", "♣", "black"),
-            style="text-align: center; margin-bottom: 40px;"
+                  Div(*board_html, id="board-cards", style="min-height: 120px;"),
+                  style="text-align: center; margin-bottom: 40px;"
                 ),
+        
                 
                 Div(
                     Div(Div(f"👤 {nickname}", style="font-size: 12px; color: #aaa;"), Div("$1000", style="font-weight: bold;"), cls="player-seat active", style="margin: 0 auto 20px auto; width: fit-content;"),
