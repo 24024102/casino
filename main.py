@@ -15,6 +15,7 @@ async def broadcast_to_hub(hub_id, message):
                 await client_send(message)
             except Exception:
                 pass
+        
 
 
 casino_style = Style("""
@@ -64,7 +65,20 @@ casino_style = Style("""
     .chat-btn { position: fixed; bottom: 30px; right: 30px; background: #45a29e; color: #0b0c10; border: none; border-radius: 50px; padding: 15px 25px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(69, 162, 158, 0.4); z-index: 1001; transition: 0.2s; }
     .chat-btn:hover { background: #66fcf1; }
     .msg-bot { background: rgba(211, 47, 47, 0.1); border-left: 4px solid #d32f2f; padding: 10px; border-radius: 4px; font-size: 14px; }
+    Div(
+    Div("D", cls="dealer-chip"), # Вот она, фишка дилера
+    Div(f"POT: ${pot}", id="pot-display", cls="pot-display"),
+    # ... остальной код
+)
     .msg-player { background: rgba(102, 252, 241, 0.1); border-right: 4px solid #66fcf1; padding: 10px; border-radius: 4px; font-size: 14px; text-align: right; }
+    .dealer-chip { 
+    background: white; color: black; border-radius: 50%; 
+    width: 35px; height: 35px; display: flex; 
+    align-items: center; justify-content: center; 
+    font-weight: bold; position: absolute; 
+    top: 80px; right: 30%; border: 2px solid #555; 
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+}                 
 """)
 def BackgroundAnimations():
     return Div(Div("♠", cls="suit"), Div("♥", cls="suit red"), Div("♣", cls="suit"), Div("♦", cls="suit red"), Div("♠", cls="suit"), cls="bg-animation")
@@ -77,10 +91,11 @@ def PokerCard(rank, suit, color_class):
         cls=f"card {color_class}"
     )
 @rt('/login')
-def post(session, nickname: str):
-    session['nickname']=nickname
+@rt('/login')
+def post(session, nickname: str, room_choice: str): 
+    session['nickname'] = nickname
+    session['room_id'] = room_choice
     return RedirectResponse('/', status_code=303)
-
 
 @rt('/')
 def get(session):
@@ -89,19 +104,24 @@ def get(session):
             Head(Title("Login | Casino"), casino_style),
             Body(
                 Div(
-                    H2(f"Welcome to {hub_name}"),
-                    P("Identify yourself to join the table:", style="color: #888;"),
                     Form(
-                        Input(type="text", name="nickname", placeholder="Enter your hacker name...", required=True, cls="login-input"),
-                        Br(),
-                        Button("JOIN TABLE", type="submit", cls="login-btn"),
-                        action="/login", method="post"
+    Input(type="text", name="nickname", placeholder="Твой ник...", required=True, cls="lobby-input"),
+    Select(
+        Option("💎 Las Vegas", value="Vegas"),
+        Option("🏎️ Monaco", value="Monaco"),
+        Option("🏮 Macau", value="Macau"),
+        name="room_choice", cls="lobby-input"
+    ),
+    Button("JOIN TABLE", type="submit", cls="lobby-btn"),
+    action="/login", method="post"
+)
                     ),
                     cls="login-container"
             )
             )
-        )
+        
     nickname = session['nickname']
+    room = session.get('room_id', 'Lobby')
     chat_script = Script("function toggleChat() { document.getElementById('chat-panel').classList.toggle('open'); }")
     visits = r.incr('visits')
     pot_key = f'hub:{hub_name}:pot_v2'
@@ -173,7 +193,7 @@ def get(session):
                 ),
                 cls="table-wood-rim"
             ),
-            Button("💬 Open Terminal", onclick="toggleChat()", cls="chat-btn"),
+            Button(" Open Terminal", onclick="toggleChat()", cls="chat-btn"),
             Div(
                 Div("Table Terminal", Span("✕", onclick="toggleChat()", style="cursor: pointer; color: #888;"), cls="chat-header"),
                 Div(
