@@ -97,7 +97,7 @@ def get():
             Script(src="https://unpkg.com/htmx.org@2.0.2"), 
             casino_style, 
             chat_script
-        ),
+        )
         Body(
             Div(
                 H2(f"♠️ {hub_name} Cluster ♣️", style="margin:0; color: #d4af37; letter-spacing: 2px;"),
