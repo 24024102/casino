@@ -20,7 +20,7 @@ async def broadcast_to_hub(hub_id, message):
 casino_style = Style("""
     body { background-color: #0b0c10; color: #c5c6c7; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
     
-    /* Красивое Лобби */
+    
     .lobby-bg { background: url('https://www.transparenttextures.com/patterns/stardust.png'), radial-gradient(circle at center, #1f2833 0%, #0b0c10 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
     .lobby-box { background: rgba(11, 12, 16, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(102, 252, 241, 0.2); border-radius: 15px; padding: 50px; width: 100%; max-width: 400px; box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(102, 252, 241, 0.1); text-align: center; }
     .lobby-title { color: #66fcf1; font-size: 32px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 3px; font-weight: 800; }
@@ -29,11 +29,11 @@ casino_style = Style("""
     .lobby-btn { background: #45a29e; color: #0b0c10; width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.3s; }
     .lobby-btn:hover { background: #66fcf1; transform: translateY(-3px); box-shadow: 0 10px 20px rgba(102,252,241,0.2); }
 
-    /* Реалистичный стол (Дерево + Сукно) */
+  
     .table-wood-rim { background: linear-gradient(to bottom, #3b2313, #1c1008); border-radius: 220px; padding: 35px; box-shadow: 0 30px 60px rgba(0,0,0,0.9), inset 0 10px 20px rgba(255,255,255,0.05); max-width: 1100px; margin: 40px auto; position: relative; }
     .table-felt { background: url('https://www.transparenttextures.com/patterns/felt.png'), radial-gradient(ellipse at center, #1b5e20 0%, #0a2e14 100%); border: 8px solid #111; border-radius: 180px; padding: 60px 40px; box-shadow: inset 0 0 80px rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; position: relative; }
     
-    /* Карты */
+    
     .card { background: linear-gradient(to bottom right, #ffffff, #f0f0f0); border-radius: 8px; width: 85px; height: 125px; box-shadow: 3px 5px 15px rgba(0,0,0,0.6); display: inline-flex; flex-direction: column; justify-content: space-between; padding: 5px; font-family: 'Georgia', serif; border: 1px solid #ccc; margin: 0 5px; transition: transform 0.2s; position: relative; }
     .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 1px solid rgba(255,255,255,0.5); border-radius: 7px; pointer-events: none; }
     .card:hover { transform: translateY(-15px) scale(1.05); z-index: 10; box-shadow: 5px 15px 25px rgba(0,0,0,0.7); }
@@ -42,14 +42,13 @@ casino_style = Style("""
     .card-top { font-size: 20px; font-weight: bold; line-height: 1; text-align: left; }
     .card-center { font-size: 45px; text-align: center; flex-grow: 1; display: flex; align-items: center; justify-content: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
     .card-bottom { font-size: 20px; font-weight: bold; line-height: 1; text-align: right; transform: rotate(180deg); }
+
     
-    /* Игроки и Банк */
     .player-seat { background: linear-gradient(145deg, #2a2a2a, #1a1a1a); border: 2px solid #333; padding: 15px 25px; border-radius: 12px; text-align: center; min-width: 130px; box-shadow: 5px 5px 15px rgba(0,0,0,0.5); position: relative; }
     .player-seat::after { content: ''; position: absolute; top: 2px; left: 2px; right: 2px; bottom: 2px; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; pointer-events: none; }
     .player-seat.active { border-color: #fbc02d; box-shadow: 0 0 25px rgba(251, 192, 45, 0.4); }
     .pot-display { font-size: 32px; font-weight: 900; color: #fbc02d; background: rgba(0,0,0,0.7); padding: 10px 30px; border-radius: 30px; border: 2px solid #555; text-shadow: 0 0 10px rgba(251, 192, 45, 0.5); box-shadow: 0 10px 20px rgba(0,0,0,0.6); margin-bottom: 30px; }
     
-    /* Кнопки действий */
     .action-btn { color: white; padding: 15px 40px; border: none; border-radius: 30px; margin: 0 10px; cursor: pointer; font-weight: 900; font-size: 16px; letter-spacing: 1px; text-transform: uppercase; box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: 0.2s; }
     .btn-fold { background: linear-gradient(to bottom, #d32f2f, #b71c1c); }
     .btn-call { background: linear-gradient(to bottom, #757575, #424242); }
@@ -57,7 +56,7 @@ casino_style = Style("""
     .action-btn:hover { transform: translateY(-3px); filter: brightness(1.2); }
     .action-btn:active { transform: translateY(2px); }
 
-    /* Чат */
+   
     #chat-panel { position: fixed; top: 0; right: -400px; width: 350px; height: 100%; background: #1f2833; border-left: 1px solid #45a29e; box-shadow: -10px 0 30px rgba(0,0,0,0.8); transition: right 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); z-index: 1000; display: flex; flex-direction: column; }
     #chat-panel.open { right: 0; }
     .chat-header { background: #0b0c10; color: #66fcf1; padding: 20px; font-size: 18px; font-weight: bold; border-bottom: 1px solid #45a29e; display: flex; justify-content: space-between; align-items: center; }
