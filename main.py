@@ -102,6 +102,7 @@ def get(session):
             )
         )
     nickname = session['nickname']
+    chat_script = Script("function toggleChat() { document.getElementById('chat-panel').classList.toggle('open'); }")
     visits = r.incr('visits')
     pot_key = f'hub:{hub_name}:pot_v2'
     if not r.exists(pot_key):
