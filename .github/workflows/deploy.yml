@@ -14,7 +14,6 @@ jobs:
             host: ${{secrets.SERVER_IP}}
             username: ubuntu
             key: ${{secrets.SSH_PRIVATE_KEY}}
-            key_is_base64: true
             script: |
                cd /app
                sudo git pull origin main

@@ -16,4 +16,7 @@ env/
 Thumbs.db
 *.sesskey
 casino_key
-casino_key.pub
+casino*
+*.pub
+
+casino_rsa
