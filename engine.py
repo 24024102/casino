@@ -16,7 +16,7 @@ TOXIC_RAISE = [
     "Toxic Senior: I bet you don't even know your Dockerfile has a critical vulnerability. I CALL."
 ]
 TOXIC_CALL = [
-    "Toxic Senior: Boring call. LGTM, moving on. 🥱",
+    "Toxic Senior: Boring call. LGTM, moving on. ",
     "Toxic Senior: Just a call? You lack the vision for architecture.",
     "Toxic Senior: Approved. Merging your bet into the pot."
 ]
