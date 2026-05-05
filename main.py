@@ -114,7 +114,7 @@ def get(session):
     if not raw_hand:
        new_hand = engine.deal_preflop([nickname])
        raw_hand = json.dumps(new_hand)
-       r.set('current_hand', raw_hand)
+       r.set('game_state_v2', raw_hand)
     hand = json.loads(str(raw_hand))
     board_html = [PokerCard(c['rank'], c['suit'], c['color']) for c in hand['board']]
     my_cards_html = [PokerCard(c['rank'], c['suit'], c['color']) for c in hand['hands'].get(nickname, [])]
@@ -155,7 +155,7 @@ def get(session):
                 ),
                 
                 Div(
-                    Div(Div("👤 {nickname}", style="font-size: 12px; color: #aaa;"), Div("$1000", style="font-weight: bold;"), cls="player-seat active", style="margin: 0 auto 20px auto; width: fit-content;"),
+                    Div(Div(f"👤 {nickname}", style="font-size: 12px; color: #aaa;"), Div("$1000", style="font-weight: bold;"), cls="player-seat active", style="margin: 0 auto 20px auto; width: fit-content;"),
                     Div(*my_cards_html, style="margin-bottom: 20px;"),
                     Form(
                         Input(type="hidden", name="player", value=nickname),
