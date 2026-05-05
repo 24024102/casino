@@ -59,21 +59,26 @@ casino_style = Style("""
 
    
     #chat-panel { position: fixed; top: 0; right: -400px; width: 350px; height: 100%; background: #1f2833; border-left: 1px solid #45a29e; box-shadow: -10px 0 30px rgba(0,0,0,0.8); transition: right 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); z-index: 1000; display: flex; flex-direction: column; }
-    #chat-panel.open { right: 0; }
-    .chat-header { background: #0b0c10; color: #66fcf1; padding: 20px; font-size: 18px; font-weight: bold; border-bottom: 1px solid #45a29e; display: flex; justify-content: space-between; align-items: center; }
-    #chat-messages { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-    .chat-btn { position: fixed; bottom: 30px; right: 30px; background: #45a29e; color: #0b0c10; border: none; border-radius: 50px; padding: 15px 25px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(69, 162, 158, 0.4); z-index: 1001; transition: 0.2s; }
-    .chat-btn:hover { background: #66fcf1; }
-    .msg-bot { background: rgba(211, 47, 47, 0.1); border-left: 4px solid #d32f2f; padding: 10px; border-radius: 4px; font-size: 14px; }
-    .msg-player { background: rgba(102, 252, 241, 0.1); border-right: 4px solid #66fcf1; padding: 10px; border-radius: 4px; font-size: 14px; text-align: right; }
+   
     .dealer-chip { 
-    background: white; color: black; border-radius: 50%; 
-    width: 35px; height: 35px; display: flex; 
-    align-items: center; justify-content: center; 
-    font-weight: bold; position: absolute; 
-    top: 80px; right: 30%; border: 2px solid #555; 
-    box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
-}                 
+        background: white; color: black; border-radius: 50%; 
+        width: 35px; height: 35px; display: flex; 
+        align-items: center; justify-content: center; 
+        font-weight: bold; position: absolute; 
+        top: 20px; left: 50%; transform: translateX(-50%);
+        border: 2px solid #555; box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
+        z-index: 10;
+    }
+    .action-btn { 
+        color: white; padding: 15px 40px; border: none; 
+        border-radius: 30px; margin: 0 10px; cursor: pointer; 
+        font-weight: 900; font-size: 16px; text-transform: uppercase; 
+        box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: 0.2s; 
+    }
+    .btn-fold { background: linear-gradient(to bottom, #d32f2f, #b71c1c); }
+    .btn-call { background: linear-gradient(to bottom, #757575, #424242); }
+    .btn-raise { background: linear-gradient(to bottom, #388e3c, #1b5e20); }
+    
 """)
 def BackgroundAnimations():
     return Div(Div("♠", cls="suit"), Div("♥", cls="suit red"), Div("♣", cls="suit"), Div("♦", cls="suit red"), Div("♠", cls="suit"), cls="bg-animation")
@@ -116,11 +121,10 @@ def get(session):
             )
         
     nickname = session['nickname']
-    room = session.get('room_id', 'Lobby')
     room = session.get('room_id', 'Vegas')
     chat_script = Script("function toggleChat() { document.getElementById('chat-panel').classList.toggle('open'); }")
     visits = r.incr('visits')
-    pot_key = f'hub:{hub_name}:game_state_v2'
+    pot_key = f'room:{room}:pot'
     if not r.exists(pot_key):
         r.set(pot_key, 0)
     pot = r.get(pot_key)
@@ -166,19 +170,23 @@ def get(session):
                         
                         Div(f"POT: ${pot}", id="pot-display", cls="pot-display"),
                         
-                        Div(*board_html, id="board-cards", style="min-height: 130px; display: flex; justify-content: center; margin-bottom: 60px;"),
+                    Div(
+    Div("D", cls="dealer-chip"), # 
+    Div(Div("Bot OOM-Killer", style="font-size: 12px; color: #aaa;"), Div("$1200", style="font-weight: bold; color: #fff;"), cls="player-seat"),
+    Div(Div("SysAdmin", style="font-size: 12px; color: #aaa;"), Div("HOST", style="font-weight: bold; color: #fbc02d;"), cls="player-seat"),
+    Div(Div("Toxic Senior", style="font-size: 12px; color: #aaa;"), Div("$850", style="font-weight: bold; color: #fff;"), cls="player-seat"),
+    style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 40px; position: relative;"
+),
                         
-                        Div(
-                            Div(Div(f"👤 {nickname}", style="font-size: 12px; color: #aaa;"), Div("$1000", style="font-weight: bold; color: #fff;"), cls="player-seat active", style="margin: 0 auto 20px auto; width: fit-content;"),
-                            Div(*my_cards_html, style="display: flex; justify-content: center; margin-bottom: 30px;"),
-                            
+                    Div(
+                           Div(Div(f"👤 {nickname}", style="font-size: 12px; color: #aaa;"), Div("$1000", style="font-weight: bold; color: #fff;"), cls="player-seat active", style="margin: 0 auto 20px auto; width: fit-content;"),
+                           Div(*my_cards_html, style="display: flex; justify-content: center; margin-bottom: 30px;"),   
                             Form(
                                 Input(type="hidden", name="player", value=nickname),
                                 Input(type="hidden", name="move", id="move-input", value=""),
                                 Button("FOLD", type="submit", onclick="document.getElementById('move-input').value='fold'", cls="action-btn btn-fold"),
                                 Button("CALL", type="submit", onclick="document.getElementById('move-input').value='call'", cls="action-btn btn-call"),
                                 Button("RAISE", type="submit", onclick="document.getElementById('move-input').value='raise'", cls="action-btn btn-raise"),
-                              
                                 onsubmit="event.preventDefault();", ws_send=True, 
                                 style="text-align: center;"
                             ),
@@ -201,7 +209,7 @@ def get(session):
             )
         )
     )
-@app.ws('/ws/hub/{hub_id}')
+@app.ws('/ws/hub/{room}')
 async def ws_action(msg: str, send, hub_id: str):
     if hub_id not in hub_connections:
         hub_connections[hub_id] = []
@@ -213,7 +221,7 @@ async def ws_action(msg: str, send, hub_id: str):
         player_name = data.get('player', 'Anonymus')
         if not move:
             return  
-        pot_key = f'hub:{hub_id}:game_state_v2'
+        pot_key = f'room:{hub_id}:pot'
         pot = int(r.get(pot_key) or "0")
         bot_response = ""
         update_board = ""
