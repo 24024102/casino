@@ -16,11 +16,7 @@ async def broadcast_to_hub(hub_id, message):
             except Exception:
                 pass
 
-def init_hub(hub_id):
-    if not r.exists(f'hub:{hub_id}:pot'):
-        r.set(f'hub:{hub_id}:pot', 0)
-    if not r.exists(f'hub:{hub_id}:hand'):
-        r.set(f'hub:{hub_id}:hand', json.dumps(engine.deal_new_round()))
+
 casino_style = Style("""
     body { background-color: #0b0f19; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
     
