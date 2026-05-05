@@ -6,7 +6,7 @@ import json
 
 hub_name = os.getenv('HUB_NAME', 'Unknown Hub')
 r = redis.Redis(host='redis', port=6379, decode_responses=True)
-app, rt = fast_app()
+app, rt = fast_app(secret_key="1234")
 hub_connections = {}
 async def broadcast_to_hub(hub_id, message):
     if hub_id in hub_connections:
@@ -78,9 +78,32 @@ def PokerCard(rank, suit, color_class):
         Div(f"{rank}{suit}", cls="card-bottom"),
         cls=f"card {color_class}"
     )
+@rt('/login')
+def post(session, nickname: str):
+    session['nickname']=nickname
+    return RedirectResponse('/', status_code=303)
+
 
 @rt('/')
-def get():
+def get(session):
+    if 'nickname' not in session:
+        return Html(
+            Head(Title("Login | Casino"), casino_style),
+            Body(
+                Div(
+                    H2(f"Welcome to {hub_name}"),
+                    P("Identify yourself to join the table:", style="color: #888;"),
+                    Form(
+                        Input(type="text", name="nickname", placeholder="Enter your hacker name...", required=True, style="padding: 10px; width: 80%; margin-bottom: 20px; border-radius: 5px; border: 1px solid #555; background: #222; color: white; font-size: 16px;"),
+                        Br(),
+                        Button("Join Table", type="submit", style="background: #2b7a2b; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px;"),
+                        action="/login", method="post"
+                    ),
+                    style="text-align: center; margin: 100px auto; padding: 50px; background: #111; border: 2px solid #333; border-radius: 10px; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.8);"
+                )
+            )
+        )
+    nickname = session['nickname']
     visits = r.incr('visits')
     pot = r.get('pot')
     raw_hand = r.get('current_hand')
@@ -91,6 +114,9 @@ def get():
     hand = json.loads(str(raw_hand))
     board_html = [PokerCard(c['rank'], c['suit'], c['color']) for c in hand['board']]
     my_cards_html = [PokerCard(c['rank'], c['suit'], c['color']) for c in hand['player']]
+    fold_vals = json.dumps({"move": "fold", "player": nickname})
+    call_vals = json.dumps({"move": "call", "player": nickname})
+    raise_vals = json.dumps ({ "move": "raise", "player": nickname})
     return Html(
         Head(
             Title(f"Casino | {hub_name}"), 
@@ -159,6 +185,7 @@ async def ws_action(msg: str, send, hub_id: str):
     try:
         data = json.loads(msg)
         move = data.get('move')
+        player_name = data.get('player', 'Anonymus')
         if not move:
             return  
         pot_key = f'hub:{hub_id}:pot'
@@ -174,9 +201,9 @@ async def ws_action(msg: str, send, hub_id: str):
             bot_response = "Toxic Senior: Oh, scaling up? Bro is deploying to production on a Friday... I respect the reckless raise. 🚀"
         update_pot = Div(f"POT: ${pot}", id="pot-display", hx_swap_oob="true", style="font-size: 28px; font-weight: bold; color: #d4af37; background: rgba(0,0,0,0.5); padding: 5px 20px; border-radius: 20px; display: inline-block; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);")
         chat_update = Div(
-        Div(Div("Player:", style="color: #5bc0de; font-size: 11px;"), f"Executed: {move.upper()}", cls="msg-player"),
-        Div(Div("System:", style="color: #d9534f; font-size: 11px;"), bot_response, cls="msg-bot"),
-          id="chat-messages", hx_swap_oob="beforeend" 
+            Div(Div(f"{player_name}:", style="color: #5bc0de; font-size: 11px;"), f"Executed: {move.upper()}", cls="msg-player"),
+            Div(Div("System:", style="color: #d9534f; font-size: 11px;"), bot_response, cls="msg-bot"),
+            id="chat-messages", hx_swap_oob="beforeend"
         )
         html_to_send = f"{update_pot}{chat_update}"
         await broadcast_to_hub(hub_id, html_to_send)
