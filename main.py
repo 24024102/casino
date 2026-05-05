@@ -197,7 +197,7 @@ def get(session):
                 id="chat-panel"
             )
         )
-    ),
+    )
 @app.ws('/ws/hub/{hub_id}')
 async def ws_action(msg: str, send, hub_id: str):
     if hub_id not in hub_connections:
