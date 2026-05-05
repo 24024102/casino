@@ -33,24 +33,52 @@ OOM_CALL_PHRASES = [
 ]
 def get_color(suit):
     return "red" if suit in [ '♥', '♦'] else "black"
-def deal_new_round():
-    deck = [{'rank': r, 'suit': s,'color': get_color(s) } for s in SUITS for r in RANKS]
+def create_deck():
+    deck = [{'rank': r, 'suit': s, 'color': get_color(s)} for s in SUITS for r in RANKS]
     random.shuffle(deck)
+    return deck
+def deal_preflop(live_player_names):
+    deck = create_deck()
+    hands = {}
+    for name in live_player_names:
+        hands[name] = [deck.pop(), deck.pop()]
+    hands['bot_oom'] = [deck.pop(), deck.pop()]
+    hands['toxic_senior'] =  [deck.pop(), deck.pop()]
     return {
-        'player': [deck.pop(), deck.pop()],
-        'bot_oom': [deck.pop(), deck.pop()],
-        'bot_toxic': [deck.pop(), deck.pop()],
-        'board': [deck.pop(), deck.pop(), deck.pop(), deck.pop()],
-        'deck_left': len(deck)
-
-
+        'hands': hands,
+        'board': [],
+        'deck': deck,
+        'phase': 'preflop'
     }
-def get_bot_reaction(bot_name, player_move, current_pot):
+def deal_next_phase(game_state):
+    deck = game_state['deck']
+    board = game_state['board']
+    phase = game_state['phase']
+    if phase == 'preflop':
+        board.extend([deck.pop(), deck.pop(), deck.pop()])
+        game_state['phase'] = 'flop' 
+    elif phase == 'flop':
+        board.append(deck.pop())
+        game_state['phase'] = 'turn'
+    elif phase == 'turn':
+        board.append(deck.pop())
+        game_state['phase'] = 'river'
+    game_state['deck'] = deck
+    game_state['board'] = board
+    return game_state
+def bot_decide_move(bot_name, bot_cards, board_cards, current_pot, current_bet):
+    """
+    В будущем бот будет смотреть на свои карты и решать: Фолд, Колл или Рейз.
+    Пока что они всегда делают CALL (чтобы игра не ломалась), но говорят твои крутые фразы.
+    """
+    # ... здесь будет математика покера ...
+    
+    move = "call" 
+    
+    # Выбираем фразу
     if bot_name == "Toxic Senior":
-        if player_move == "fold": return random.choice(TOXIC_FOLD)
-        elif player_move == "raise": return random.choice(TOXIC_RAISE)
-        else: return random.choice(TOXIC_CALL)
-            
-    elif bot_name == "Bot OOM-Killer":
-        if current_pot > 500: return random.choice(OOM_ALLIN)
-        else: return random.choice(OOM_CALL_PHRASES)
+        phrase = random.choice(TOXIC_CALL)
+    else:
+        phrase = random.choice(OOM_ALLIN) if current_pot > 500 else random.choice(OOM_CALL_PHRASES)
+        
+    return {"move": move, "phrase": phrase}

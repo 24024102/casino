@@ -22,54 +22,55 @@ def init_hub(hub_id):
     if not r.exists(f'hub:{hub_id}:hand'):
         r.set(f'hub:{hub_id}:hand', json.dumps(engine.deal_new_round()))
 casino_style = Style("""
-    body { background-color: #1a1a1a; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
-    .poker-table { 
-        background: radial-gradient(circle, #2e7a48 0%, #11381f 100%); 
-        border: 25px solid #3e2723; border-radius: 200px; 
-        box-shadow: inset 0 0 50px rgba(0,0,0,0.8), 0 20px 50px rgba(0,0,0,0.9); 
-        padding: 50px; max-width: 1000px; margin: 40px auto; position: relative;
-    }
-    .card {
-        background: white; border-radius: 8px; width: 80px; height: 115px; 
-        box-shadow: 2px 5px 15px rgba(0,0,0,0.4); display: inline-flex; 
-        flex-direction: column; justify-content: space-between; padding: 5px; 
-        font-family: 'Times New Roman', serif; border: 1px solid #ddd;
-        margin: 0 -10px; transition: transform 0.2s;
-    }
+    body { background-color: #0b0f19; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
+    
+    /* Анимации мастей на фоне */
+    .bg-animation { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; overflow: hidden; background: radial-gradient(circle, #1a1a2e 0%, #0b0b12 100%); }
+    .suit { position: absolute; font-size: 60px; color: rgba(255, 255, 255, 0.03); animation: floatUp 15s linear infinite; bottom: -100px; }
+    .suit.red { color: rgba(217, 32, 32, 0.05); }
+    @keyframes floatUp { 0% { transform: translateY(0) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-110vh) rotate(360deg); opacity: 0; } }
+    .suit:nth-child(1) { left: 10%; animation-duration: 12s; }
+    .suit:nth-child(2) { left: 30%; animation-duration: 18s; animation-delay: 3s; font-size: 80px; }
+    .suit:nth-child(3) { left: 50%; animation-duration: 14s; animation-delay: 6s; }
+    .suit:nth-child(4) { left: 70%; animation-duration: 20s; animation-delay: 1s; font-size: 90px; }
+    .suit:nth-child(5) { left: 90%; animation-duration: 16s; animation-delay: 4s; }
+
+    /* Меню логина (Glassmorphism) */
+    .login-container { background: rgba(20, 20, 25, 0.85); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 40px; max-width: 450px; margin: 150px auto; text-align: center; box-shadow: 0 0 40px rgba(0, 255, 128, 0.1); }
+    .login-input { background: rgba(0, 0, 0, 0.5); border: 1px solid #444; color: #00ff88; padding: 15px; width: 80%; border-radius: 10px; font-size: 18px; margin-bottom: 25px; outline: none; transition: all 0.3s ease; }
+    .login-input:focus { border-color: #00ff88; box-shadow: 0 0 15px rgba(0, 255, 128, 0.3); }
+    .login-btn { background: linear-gradient(45deg, #2b7a2b, #1e5c1e); color: white; padding: 15px 30px; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: transform 0.2s; }
+    .login-btn:hover { transform: scale(1.05); }
+
+    /* Стол и карты */
+    .poker-table { background: radial-gradient(circle, #2e7a48 0%, #11381f 100%); border: 25px solid #3e2723; border-radius: 200px; box-shadow: inset 0 0 50px rgba(0,0,0,0.8), 0 20px 50px rgba(0,0,0,0.9); padding: 50px; max-width: 1000px; margin: 40px auto; position: relative; }
+    .card { background: white; border-radius: 8px; width: 80px; height: 115px; box-shadow: 2px 5px 15px rgba(0,0,0,0.4); display: inline-flex; flex-direction: column; justify-content: space-between; padding: 5px; font-family: 'Times New Roman', serif; border: 1px solid #ddd; margin: 0 -10px; transition: transform 0.2s; }
     .card:hover { transform: translateY(-10px); z-index: 10; }
     .card.red { color: #d92020; }
     .card.black { color: #111; }
     .card-top { font-size: 18px; font-weight: bold; line-height: 1; text-align: left; }
     .card-center { font-size: 36px; text-align: center; flex-grow: 1; display: flex; align-items: center; justify-content: center; }
     .card-bottom { font-size: 18px; font-weight: bold; line-height: 1; text-align: right; transform: rotate(180deg); }
+    
     .player-seat { background: rgba(0,0,0,0.6); border: 2px solid #555; padding: 15px 25px; border-radius: 50px; text-align: center; min-width: 120px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
     .player-seat.active { border-color: #f0ad4e; box-shadow: 0 0 20px rgba(240, 173, 78, 0.5); }
     
-    #chat-panel {
-        position: fixed; top: 0; right: -400px; width: 350px; height: 100%; 
-        background: #252526; border-left: 1px solid #333; box-shadow: -10px 0 30px rgba(0,0,0,0.8); 
-        transition: right 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); z-index: 1000;
-        display: flex; flex-direction: column;
-    }
+    /* Чат */
+    #chat-panel { position: fixed; top: 0; right: -400px; width: 350px; height: 100%; background: #252526; border-left: 1px solid #333; box-shadow: -10px 0 30px rgba(0,0,0,0.8); transition: right 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); z-index: 1000; display: flex; flex-direction: column; }
     #chat-panel.open { right: 0; }
     .chat-header { background: #1e1e1e; padding: 20px; font-size: 18px; font-weight: bold; border-bottom: 1px solid #333; display: flex; justify-content: space-between; }
     #chat-messages { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-    .chat-btn {
-        position: fixed; bottom: 30px; right: 30px; background: #007acc; color: white; border: none;
-        border-radius: 50px; padding: 15px 25px; font-size: 16px; font-weight: bold; cursor: pointer;
-        box-shadow: 0 4px 15px rgba(0,122,204,0.4); z-index: 1001; transition: background 0.2s;
-    }
+    .chat-btn { position: fixed; bottom: 30px; right: 30px; background: #007acc; color: white; border: none; border-radius: 50px; padding: 15px 25px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(0,122,204,0.4); z-index: 1001; transition: background 0.2s; }
     .chat-btn:hover { background: #005f9e; }
-    
     .msg-bot { background: #3a1c1c; border-left: 4px solid #d9534f; padding: 10px; border-radius: 4px; font-size: 14px; }
     .msg-player { background: #1c2b3a; border-right: 4px solid #5bc0de; padding: 10px; border-radius: 4px; font-size: 14px; text-align: right; }
 """)
 
 chat_script = Script("""
-    function toggleChat() {
-        document.getElementById('chat-panel').classList.toggle('open');
-    }
+    function toggleChat() { document.getElementById('chat-panel').classList.toggle('open'); }
 """)
+def BackgroundAnimations():
+    return Div(Div("♠", cls="suit"), Div("♥", cls="suit red"), Div("♣", cls="suit"), Div("♦", cls="suit red"), Div("♠", cls="suit"), cls="bg-animation")
 
 def PokerCard(rank, suit, color_class):
     return Div(
@@ -108,12 +109,12 @@ def get(session):
     pot = r.get('pot')
     raw_hand = r.get('current_hand')
     if not raw_hand:
-       new_hand = engine.deal_new_round()
+       new_hand = engine.deal_preflop([nickname])
        raw_hand = json.dumps(new_hand)
-    r.set('current_hand', raw_hand)
+       r.set('current_hand', raw_hand)
     hand = json.loads(str(raw_hand))
     board_html = [PokerCard(c['rank'], c['suit'], c['color']) for c in hand['board']]
-    my_cards_html = [PokerCard(c['rank'], c['suit'], c['color']) for c in hand['player']]
+    my_cards_html = [PokerCard(c['rank'], c['suit'], c['color']) for c in hand['hands'].get(nickname, [])]
     fold_vals = json.dumps({"move": "fold", "player": nickname})
     call_vals = json.dumps({"move": "call", "player": nickname})
     raise_vals = json.dumps ({ "move": "raise", "player": nickname})
@@ -151,14 +152,17 @@ def get(session):
                 ),
                 
                 Div(
-                    Div(Div("👤 You", style="font-size: 12px; color: #aaa;"), Div("$1000", style="font-weight: bold;"), cls="player-seat active", style="margin: 0 auto 20px auto; width: fit-content;"),
-                    Div(
-                     Button("FOLD", ws_send=True, hx_vals='{"move": "fold"}', style="background: #a83232; color: white; padding: 12px 30px; border: none; border-radius: 4px; margin: 5px; cursor: pointer; font-weight: bold; letter-spacing: 1px;"),
-              Button("CALL", ws_send=True, hx_vals='{"move": "call"}', style="background: #4a4a4a; color: white; padding: 12px 30px; border: none; border-radius: 4px; margin: 5px; cursor: pointer; font-weight: bold; letter-spacing: 1px;"),
-                 Button("RAISE", ws_send=True, hx_vals='{"move": "raise"}', style="background: #2b7a2b; color: white; padding: 12px 30px; border: none; border-radius: 4px; margin: 5px; cursor: pointer; font-weight: bold; letter-spacing: 1px;"),
-                  ),
-                    style="text-align: center; transform: translateY(30px);",
-                   hx_ext="ws", ws_connect=f"/ws/hub/{hub_name}" # Подключаем сокет прямо сюда!
+                    Div(Div("👤 {nickname}", style="font-size: 12px; color: #aaa;"), Div("$1000", style="font-weight: bold;"), cls="player-seat active", style="margin: 0 auto 20px auto; width: fit-content;"),
+                    Div(*my_cards_html, style="margin-bottom: 20px;"),
+                    Form(
+                        Input(type="hidden", name="player", value=nickname),
+                        Button("FOLD", type="submit", onclick="this.form.move.value='fold'", style="background: #a83232; color: white; padding: 12px 30px; border: none; border-radius: 4px; margin: 5px; cursor: pointer; font-weight: bold;"),
+                        Button("CALL", type="submit", onclick="this.form.move.value='call'", style="background: #4a4a4a; color: white; padding: 12px 30px; border: none; border-radius: 4px; margin: 5px; cursor: pointer; font-weight: bold;"),
+                        Button("RAISE", type="submit", onclick="this.form.move.value='raise'", style="background: #2b7a2b; color: white; padding: 12px 30px; border: none; border-radius: 4px; margin: 5px; cursor: pointer; font-weight: bold;"),
+                        Input(type="hidden", name="move", value=""), # Сюда подставится значение кнопки
+                        hx_ext="ws", ws_connect=f"/ws/hub/{hub_name}", ws_send=True, hx_swap="none", # hx_swap="none" спасает от исчезновения
+                        style="text-align: center; transform: translateY(30px);"
+                    )
                 ),
                 cls="poker-table"
             ),
@@ -191,11 +195,18 @@ async def ws_action(msg: str, send, hub_id: str):
         pot_key = f'hub:{hub_id}:pot'
         pot = int(r.get(pot_key) or "0")
         bot_response = ""
+        update_board = ""
         if move == 'fold':
             bot_response = "Toxic Senior: Folding already? Your uptime is worse than AWS us-east-1. 📉"
         elif move == 'call':
             pot = r.incrby(pot_key, 50)
+            
             bot_response = "Bot OOM-Killer: Just a call? I can read your bluff like a plain-text .env file. 🤡"
+            game_state = json.loads(r.get('current_hand'))
+            updated_state = engine.deal_next_phase(game_state)
+            r.set('current_hand', json.dumps(updated_state))
+            board_html = [PockerCard(c['rank'], c['suit'], c['color']) for c in updated_state['board']]
+            update_board = Div(*board_html, id="board-cards", hx_swap_oob="innerHTML")       
         elif move == 'raise':
             pot = r.incrby(pot_key, 100)
             bot_response = "Toxic Senior: Oh, scaling up? Bro is deploying to production on a Friday... I respect the reckless raise. 🚀"
@@ -205,16 +216,8 @@ async def ws_action(msg: str, send, hub_id: str):
             Div(Div("System:", style="color: #d9534f; font-size: 11px;"), bot_response, cls="msg-bot"),
             id="chat-messages", hx_swap_oob="beforeend"
         )
-        html_to_send = f"{update_pot}{chat_update}"
+        html_to_send = f"{update_pot}{chat_update}{update_board}"
         await broadcast_to_hub(hub_id, html_to_send)
         
     finally:
         pass
-@rt('/deal')
-def post():
-    r.set('current_hand', json.dumps(engine.deal_new_round()))
-    r.set('pot', 0)
-    return Response(headers={'HX-Refresh': 'true'})
-if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=5001)
