@@ -123,8 +123,7 @@ def get(session):
             Title(f"{hub_name} Table"), 
             Script(src="https://unpkg.com/htmx.org@2.0.2"), 
             Script(src="https://unpkg.com/htmx-ext-ws@2.0.0/ws.js"),
-            casino_style, 
-            chat_script
+            chat_script = Script("function toggleChat() { document.getElementById('chat-panel').classList.toggle('open'); }")
         ),
         Body(
             Div(
@@ -152,15 +151,14 @@ def get(session):
                             Div(Div(f"👤 {nickname}", style="font-size: 12px; color: #aaa;"), Div("$1000", style="font-weight: bold; color: #fff;"), cls="player-seat active", style="margin: 0 auto 20px auto;"),
                             Div(*my_cards_html, style="display: flex; justify-content: center; margin-bottom: 30px;"),
                             
-                            # ФОРМА С ЖЕСТКОЙ ЗАЩИТОМ ОТ ПЕРЕЗАГРУЗКИ СТРАНИЦЫ
+                      
                             Form(
                                 Input(type="hidden", name="player", value=nickname),
                                 Input(type="hidden", name="move", id="move-input", value=""),
                                 Button("FOLD", type="submit", onclick="document.getElementById('move-input').value='fold'", cls="action-btn btn-fold"),
                                 Button("CALL", type="submit", onclick="document.getElementById('move-input').value='call'", cls="action-btn btn-call"),
                                 Button("RAISE", type="submit", onclick="document.getElementById('move-input').value='raise'", cls="action-btn btn-raise"),
-                                onsubmit="event.preventDefault();", # ВАЖНО: блокирует перезагрузку!
-                                ws_send=True, 
+                                onsubmit="event.preventDefault();", 
                                 style="text-align: center;"
                             ),
                             style="width: 100%; text-align: center;"
