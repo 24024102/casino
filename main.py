@@ -106,8 +106,11 @@ def get(session):
         )
     nickname = session['nickname']
     visits = r.incr('visits')
-    pot = r.get('pot')
-    raw_hand = r.get('current_hand')
+    pot_key = f'hub:{hub_name}:pot_v2'
+    if not r.exists(pot_key):
+        r.set(pot_key, 0)
+    pot = r.get(pot_key)
+    raw_hand = r.get('game_state_v2')
     if not raw_hand:
        new_hand = engine.deal_preflop([nickname])
        raw_hand = json.dumps(new_hand)
@@ -192,7 +195,7 @@ async def ws_action(msg: str, send, hub_id: str):
         player_name = data.get('player', 'Anonymus')
         if not move:
             return  
-        pot_key = f'hub:{hub_id}:pot'
+        pot_key = f'hub:{hub_id}:pot_v2'
         pot = int(r.get(pot_key) or "0")
         bot_response = ""
         update_board = ""
@@ -202,10 +205,10 @@ async def ws_action(msg: str, send, hub_id: str):
             pot = r.incrby(pot_key, 50)
             
             bot_response = "Bot OOM-Killer: Just a call? I can read your bluff like a plain-text .env file. 🤡"
-            game_state = json.loads(r.get('current_hand'))
+            game_state = json.loads(r.get('game_state_v2'))
             updated_state = engine.deal_next_phase(game_state)
-            r.set('current_hand', json.dumps(updated_state))
-            board_html = [PockerCard(c['rank'], c['suit'], c['color']) for c in updated_state['board']]
+            r.set('game_state_v2', json.dumps(updated_state))
+            board_html = [PokerCard(c['rank'], c['suit'], c['color']) for c in updated_state['board']]
             update_board = Div(*board_html, id="board-cards", hx_swap_oob="innerHTML")       
         elif move == 'raise':
             pot = r.incrby(pot_key, 100)
