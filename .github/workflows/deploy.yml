@@ -1,0 +1,20 @@
+name: Deploy Casino to AWS Production
+
+on: 
+  push:
+    branches:
+      - main
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+        - name: Deploy to AWS EC2
+          uses: appleboy/ssh-action@master
+          with:
+            host: ${{secrets.SERVER_IP}}
+            username: ubuntu
+            key: ${{secrets.SSH_PRIVATE_KEY}}
+            script: |
+               cd /app
+               sudo git pull origin main
+               sudo docker compose up -d --build 

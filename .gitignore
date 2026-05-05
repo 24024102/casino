@@ -14,3 +14,6 @@ env/
 .terraform.lock.hcl
 .DS_Store
 Thumbs.db
+*.sesskey
+casino_key
+casino_key.pub
