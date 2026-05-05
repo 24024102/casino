@@ -1,0 +1,53 @@
+version: '3.8'
+services:
+  web: 
+    build: .
+    ports:
+      - "5001:5001"
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    environment:
+      - PYTHONUNBUFFERED=1
+  redis:
+    image: "redis:alpine"
+    ports:
+      - "6379:6379"
+  hub-vegas:
+    build: .
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    environment:
+      - PYTHONUNBUFFERED=1
+      - HUB_NAME=Vegas
+  hub-macau:
+    build: .
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    environment:
+      - PYTHONUNBUFFERED=1
+      - HUB_NAME=Macau
+  hub-monaco:
+    build: .
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    environment:
+      - PYTHONUNBUFFERED=1
+      - HUB_NAME=Monaco
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - hub-monaco
+      - hub-vegas
+      - hub-macau
