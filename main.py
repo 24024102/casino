@@ -7,11 +7,20 @@ import json
 hub_name = os.getenv('HUB_NAME', 'Unknown Hub')
 r = redis.Redis(host='redis', port=6379, decode_responses=True)
 app, rt = fast_app()
+hub_connections = {}
+async def broadcast_to_hub(hub_id, message):
+    if hub_id in hub_connections:
+        for client_send in hub_connections[hub_id]:
+            try:
+                await client_send(message)
+            except Exception:
+                pass
 
-if not r.exists('pot'):
-    r.set('pot', 0)
-if not r.exists('current_hand'):
-    r.set('current_hand', json.dumps(engine.deal_new_round()))
+def init_hub(hub_id):
+    if not r.exists(f'hub:{hub_id}:pot'):
+        r.set(f'hub:{hub_id}:pot', 0)
+    if not r.exists(f'hub:{hub_id}:hand'):
+        r.set(f'hub:{hub_id}:hand', json.dumps(engine.deal_new_round()))
 casino_style = Style("""
     body { background-color: #1a1a1a; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
     .poker-table { 
@@ -92,37 +101,38 @@ def get():
         Body(
             Div(
                 H2(f"♠️ {hub_name} Cluster ♣️", style="margin:0; color: #d4af37; letter-spacing: 2px;"),
-                P(f"Total connections: {visits} | DB Ping: 2ms", style="margin:5px 0 0 0; font-size: 12px; color: #888;"),
-                style="text-align: center; padding: 20px; background: #111; border-bottom: 1px solid #333;"
-            ),
+            P(f"Total connections: {visits} | DB Ping: 2ms", style="margin:5px 0 0 0; font-size: 12px; color: #888;"),
+             style="text-align: center; padding: 20px; background: #111; border-bottom: 1px solid #333;"
+            )
             
             Div(
                 Div(
                     Div(Div("Bot OOM-Killer", style="font-size: 12px; color: #aaa;"), Div("$1200", style="font-weight: bold;"), cls="player-seat"),
-                    Div(Div("SysAdmin", style="font-size: 12px; color: #aaa;"), Div("House Bank", style="font-weight: bold; color: #d4af37;"), cls="player-seat"),
-                    Div(Div("Toxic Senior", style="font-size: 12px; color: #aaa;"), Div("$850", style="font-weight: bold;"), cls="player-seat"),
-                    style="display: flex; justify-content: space-around; margin-bottom: 40px; transform: translateY(-30px);"
+                Div(Div("SysAdmin", style="font-size: 12px; color: #aaa;"), Div("House Bank", style="font-weight: bold; color: #d4af37;"), cls="player-seat"),
+                  Div(Div("Toxic Senior", style="font-size: 12px; color: #aaa;"), Div("$850", style="font-weight: bold;"), cls="player-seat"),
+                style="display: flex; justify-content: space-around; margin-bottom: 40px; transform: translateY(-30px);"
                 ),
                 
                 Div(
-                    Div(f"POT: ${pot}", id="pot-display", style="font-size: 28px; font-weight: bold; color: #d4af37; background: rgba(0,0,0,0.5); padding: 5px 20px; border-radius: 20px; display: inline-block; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);"),
-                    Br(),
-                    PokerCard("A", "♠", "black"),
-                    PokerCard("K", "♥", "red"),
-                    PokerCard("10", "♦", "red"),
-                    PokerCard("J", "♠", "black"),
-                    PokerCard("Q", "♣", "black"),
-                    style="text-align: center; margin-bottom: 40px;"
+                  Div(f"POT: ${pot}", id="pot-display", style="font-size: 28px; font-weight: bold; color: #d4af37; background: rgba(0,0,0,0.5); padding: 5px 20px; border-radius: 20px; display: inline-block; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);"),
+                  Br(),
+                  PokerCard("A", "♠", "black"),
+                  PokerCard("K", "♥", "red"),
+                  PokerCard("10", "♦", "red"),
+              PokerCard("J", "♠", "black"),
+                 PokerCard("Q", "♣", "black"),
+            style="text-align: center; margin-bottom: 40px;"
                 ),
                 
                 Div(
                     Div(Div("👤 You", style="font-size: 12px; color: #aaa;"), Div("$1000", style="font-weight: bold;"), cls="player-seat active", style="margin: 0 auto 20px auto; width: fit-content;"),
                     Div(
-                        Button("FOLD", hx_post="/action?move=fold", hx_target="#chat-messages", hx_swap="beforeend", style="background: #a83232; color: white; padding: 12px 30px; border: none; border-radius: 4px; margin: 5px; cursor: pointer; font-weight: bold; letter-spacing: 1px;"),
-                        Button("CALL", hx_post="/action?move=call", hx_target="#chat-messages", hx_swap="beforeend", style="background: #4a4a4a; color: white; padding: 12px 30px; border: none; border-radius: 4px; margin: 5px; cursor: pointer; font-weight: bold; letter-spacing: 1px;"),
-                        Button("RAISE", hx_post="/action?move=raise", hx_target="#chat-messages", hx_swap="beforeend", style="background: #2b7a2b; color: white; padding: 12px 30px; border: none; border-radius: 4px; margin: 5px; cursor: pointer; font-weight: bold; letter-spacing: 1px;"),
-                    ),
-                    style="text-align: center; transform: translateY(30px);"
+                     Button("FOLD", ws_send=True, hx_vals='{"move": "fold"}', style="background: #a83232; color: white; padding: 12px 30px; border: none; border-radius: 4px; margin: 5px; cursor: pointer; font-weight: bold; letter-spacing: 1px;"),
+              Button("CALL", ws_send=True, hx_vals='{"move": "call"}', style="background: #4a4a4a; color: white; padding: 12px 30px; border: none; border-radius: 4px; margin: 5px; cursor: pointer; font-weight: bold; letter-spacing: 1px;"),
+                 Button("RAISE", ws_send=True, hx_vals='{"move": "raise"}', style="background: #2b7a2b; color: white; padding: 12px 30px; border: none; border-radius: 4px; margin: 5px; cursor: pointer; font-weight: bold; letter-spacing: 1px;"),
+                  ),
+                    style="text-align: center; transform: translateY(30px);",
+                   hx_ext="ws", ws_connect=f"/ws/hub/{hub_name}" # Подключаем сокет прямо сюда!
                 ),
                 cls="poker-table"
             ),
@@ -132,33 +142,47 @@ def get():
             Div(
                 Div("Table Terminal", Span("✕", onclick="toggleChat()", style="cursor: pointer; color: #888;"), cls="chat-header"),
                 Div(
-                    Div(Div("SysAdmin:", style="color: #888; font-size: 11px;"), "Welcome to the cluster. Blinds are 10/20. Don't forget to commit your chips.", cls="msg-bot"),
-                    id="chat-messages"
+                Div(Div("SysAdmin:", style="color: #888; font-size: 11px;"), "Welcome to the cluster. Blinds are 10/20. Don't forget to commit your chips.", cls="msg-bot"),
+                id="chat-messages"
                 ),
                 id="chat-panel"
             )
         )
     )
 
-@rt('/action')
-def post(move: str):
-    bot_response = ""
-    pot = int(r.get('pot') or 0)
-    
-    if move == 'fold':
-        bot_response = "Toxic Senior: Folding already? Your uptime is worse than AWS us-east-1. 📉"
-    elif move == 'call':
-        pot = r.incrby('pot', 50)
-        bot_response = "Bot OOM-Killer: Just a call? I can read your bluff like a plain-text .env file. 🤡"
-    elif move == 'raise':
-        pot = r.incrby('pot', 100)
-        bot_response = "Toxic Senior: Oh, scaling up? Bro is deploying to production on a Friday... I respect the reckless raise. 🚀"
-    update_pot = Div(f"POT: ${pot}", id="pot-display", hx_swap_oob="true", style="font-size: 28px; font-weight: bold; color: #d4af37; background: rgba(0,0,0,0.5); padding: 5px 20px; border-radius: 20px; display: inline-block; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);")
-    return Div(
-        Div(Div("You:", style="color: #5bc0de; font-size: 11px;"), f"Executed: {move.upper()}", cls="msg-player"),
+@app.ws('/ws/hub/{hub_id}')
+async def ws_action(msg: str, send, hub_id: str):
+    if hub_id not in hub_connections:
+        hub_connections[hub_id] = []
+    if send not in hub_connections[hub_id]:
+        hub_connections[hub_id].append(send)
+    try:
+        data = json.loads(msg)
+        move = data.get('move')
+        if not move:
+            return  
+        pot_key = f'hub:{hub_id}:pot'
+        pot = int(r.get(pot_key) or "0")
+        bot_response = ""
+        if move == 'fold':
+            bot_response = "Toxic Senior: Folding already? Your uptime is worse than AWS us-east-1. 📉"
+        elif move == 'call':
+            pot = r.incrby(pot_key, 50)
+            bot_response = "Bot OOM-Killer: Just a call? I can read your bluff like a plain-text .env file. 🤡"
+        elif move == 'raise':
+            pot = r.incrby(pot_key, 100)
+            bot_response = "Toxic Senior: Oh, scaling up? Bro is deploying to production on a Friday... I respect the reckless raise. 🚀"
+        update_pot = Div(f"POT: ${pot}", id="pot-display", hx_swap_oob="true", style="font-size: 28px; font-weight: bold; color: #d4af37; background: rgba(0,0,0,0.5); padding: 5px 20px; border-radius: 20px; display: inline-block; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);")
+        chat_update = Div(
+        Div(Div("Player:", style="color: #5bc0de; font-size: 11px;"), f"Executed: {move.upper()}", cls="msg-player"),
         Div(Div("System:", style="color: #d9534f; font-size: 11px;"), bot_response, cls="msg-bot"),
-        update_pot
-    )
+          id="chat-messages", hx_swap_oob="beforeend" 
+        )
+        html_to_send = f"{update_pot}{chat_update}"
+        await broadcast_to_hub(hub_id, html_to_send)
+        
+    finally:
+        pass
 @rt('/deal')
 def post():
     r.set('current_hand', json.dumps(engine.deal_new_round()))
