@@ -148,39 +148,31 @@ def get(session):
             chat_script, 
             casino_style
         ),
-        Body(
-            
+      Body(
             BackgroundAnimations(),
+            # Шапка сайта
             Div(
                 H2(f"Welcome to {hub_name}", style="margin:0; color: #66fcf1; letter-spacing: 2px; text-transform: uppercase;"),
                 P(f"Live Connections: {visits} | Server Health: Excellent", style="margin:5px 0 0 0; font-size: 12px; color: #c5c6c7;"),
                 style="text-align: center; padding: 20px; background: rgba(11, 12, 16, 0.9); border-bottom: 2px solid #1f2833;"
             ),
-            
+            # Стол
             Div(
                 Div(
                     Div(
-                       Div(
-    Div("D", cls="dealer-chip"), 
-    Div(Div("Bot OOM-Killer", style="font-size: 12px; color: #aaa;"), Div("$1200", style="font-weight: bold; color: #fff;"), cls="player-seat"),
-    Div(Div("SysAdmin", style="font-size: 12px; color: #aaa;"), Div("HOST", style="font-weight: bold; color: #fbc02d;"), cls="player-seat"),
-    Div(Div("Toxic Senior", style="font-size: 12px; color: #aaa;"), Div("$850", style="font-weight: bold; color: #fff;"), cls="player-seat"),
-    style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 40px; position: relative;"
-),
+                        Div(
+                            Div("D", cls="dealer-chip"), 
+                            Div(Div("Bot OOM-Killer", style="font-size: 12px; color: #aaa;"), Div("$1200", style="font-weight: bold; color: #fff;"), cls="player-seat"),
+                            Div(Div("SysAdmin", style="font-size: 12px; color: #aaa;"), Div("HOST", style="font-weight: bold; color: #fbc02d;"), cls="player-seat"),
+                            Div(Div("Toxic Senior", style="font-size: 12px; color: #aaa;"), Div("$850", style="font-weight: bold; color: #fff;"), cls="player-seat"),
+                            style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 40px; position: relative;"
+                        ),
                         
                         Div(f"POT: ${pot}", id="pot-display", cls="pot-display"),
-                        
-                    Div(
-    Div("D", cls="dealer-chip"), # 
-    Div(Div("Bot OOM-Killer", style="font-size: 12px; color: #aaa;"), Div("$1200", style="font-weight: bold; color: #fff;"), cls="player-seat"),
-    Div(Div("SysAdmin", style="font-size: 12px; color: #aaa;"), Div("HOST", style="font-weight: bold; color: #fbc02d;"), cls="player-seat"),
-    Div(Div("Toxic Senior", style="font-size: 12px; color: #aaa;"), Div("$850", style="font-weight: bold; color: #fff;"), cls="player-seat"),
-    style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 40px; position: relative;"
-),
-                        
-                    Div(
-                           Div(Div(f"👤 {nickname}", style="font-size: 12px; color: #aaa;"), Div("$1000", style="font-weight: bold; color: #fff;"), cls="player-seat active", style="margin: 0 auto 20px auto; width: fit-content;"),
-                           Div(*my_cards_html, style="display: flex; justify-content: center; margin-bottom: 30px;"),   
+                        Div(*board_html, id="board-cards", style="min-height: 130px; display: flex; justify-content: center; margin-bottom: 60px;"),
+                        Div(
+                            Div(Div(f"👤 {nickname}", style="font-size: 12px; color: #aaa;"), Div("$1000", style="font-weight: bold; color: #fff;"), cls="player-seat active", style="margin: 0 auto 20px auto; width: fit-content;"),
+                            Div(*my_cards_html, style="display: flex; justify-content: center; margin-bottom: 30px;"),
                             Form(
                                 Input(type="hidden", name="player", value=nickname),
                                 Input(type="hidden", name="move", id="move-input", value=""),
@@ -194,22 +186,19 @@ def get(session):
                         ),
                         cls="table-felt"
                     ),
-                    hx_ext="ws", ws_connect=f"/ws/hub/{hub_name}" 
+                    hx_ext="ws", ws_connect=f"/ws/hub/{room}" 
                 ),
                 cls="table-wood-rim"
             ),
+            
             Button(" Open Terminal", onclick="toggleChat()", cls="chat-btn"),
             Div(
                 Div("Table Terminal", Span("✕", onclick="toggleChat()", style="cursor: pointer; color: #888;"), cls="chat-header"),
-                Div(
-                    Div(Div("SysAdmin:", style="color: #888; font-size: 11px;"), "Welcome to the cluster. Blinds are 10/20.", cls="msg-bot"),
-                    id="chat-messages"
-                ),
+                Div(Div(Div("SysAdmin:", style="color: #888; font-size: 11px;"), "Welcome to the cluster.", cls="msg-bot"), id="chat-messages"),
                 id="chat-panel"
             )
         )
-    )
-@app.ws('/ws/hub/{room}')
+@app.ws('/ws/hub/{hub_id}')
 async def ws_action(msg: str, send, hub_id: str):
     if hub_id not in hub_connections:
         hub_connections[hub_id] = []
