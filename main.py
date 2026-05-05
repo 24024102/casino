@@ -97,13 +97,13 @@ def get():
             Script(src="https://unpkg.com/htmx.org@2.0.2"), 
             casino_style, 
             chat_script
-        )
+        ),
         Body(
             Div(
                 H2(f"♠️ {hub_name} Cluster ♣️", style="margin:0; color: #d4af37; letter-spacing: 2px;"),
             P(f"Total connections: {visits} | DB Ping: 2ms", style="margin:5px 0 0 0; font-size: 12px; color: #888;"),
              style="text-align: center; padding: 20px; background: #111; border-bottom: 1px solid #333;"
-            )
+            ),
             
             Div(
                 Div(
