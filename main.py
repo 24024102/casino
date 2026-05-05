@@ -120,7 +120,7 @@ def get(session):
     raise_vals = json.dumps ({ "move": "raise", "player": nickname})
     return Html(
        Head(
-            Title(f"{room} Table"), 
+            Title(f"{hub_name} Table"), 
             Script(src="https://unpkg.com/htmx.org@2.0.2"), 
             Script(src="https://unpkg.com/htmx-ext-ws@2.0.0/ws.js"),
             casino_style, 
@@ -128,7 +128,7 @@ def get(session):
         ),
         Body(
             Div(
-                H2(f"Welcome to {room}", style="margin:0; color: #66fcf1; letter-spacing: 2px; text-transform: uppercase;"),
+                H2(f"Welcome to {hub_name}", style="margin:0; color: #66fcf1; letter-spacing: 2px; text-transform: uppercase;"),
                 P(f"Live Connections: {visits} | Server Health: Excellent", style="margin:5px 0 0 0; font-size: 12px; color: #c5c6c7;"),
                 style="text-align: center; padding: 20px; background: #0b0c10; border-bottom: 2px solid #1f2833;"
             ),
@@ -167,8 +167,8 @@ def get(session):
                         ),
                         cls="table-felt"
                     ),
-                    # Вебсокеты теперь подключаются к КОМНАТЕ, а не к контейнеру
-                    hx_ext="ws", ws_connect=f"/ws/hub/{room}" 
+                    
+                    hx_ext="ws", ws_connect=f"/ws/hub/{hub_name}" 
                 ),
                 cls="table-wood-rim"
             ),
