@@ -150,7 +150,6 @@ def get(session):
         ),
       Body(
             BackgroundAnimations(),
-            # Шапка сайта
             Div(
                 H2(f"Welcome to {hub_name}", style="margin:0; color: #66fcf1; letter-spacing: 2px; text-transform: uppercase;"),
                 P(f"Live Connections: {visits} | Server Health: Excellent", style="margin:5px 0 0 0; font-size: 12px; color: #c5c6c7;"),
@@ -198,6 +197,7 @@ def get(session):
                 id="chat-panel"
             )
         )
+    ),
 @app.ws('/ws/hub/{hub_id}')
 async def ws_action(msg: str, send, hub_id: str):
     if hub_id not in hub_connections:
@@ -239,6 +239,4 @@ async def ws_action(msg: str, send, hub_id: str):
         
     finally:
         pass
-if __name__ == '__main__':
-    from fasthtml.common import serve
-    serve(host='0.0.0.0', port=5001)
+if __name__ == '__main__': serve()
