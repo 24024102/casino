@@ -18,52 +18,54 @@ async def broadcast_to_hub(hub_id, message):
 
 
 casino_style = Style("""
-    body { background-color: #0b0f19; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
+    body { background-color: #0b0c10; color: #c5c6c7; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
     
-    /* Анимации мастей на фоне */
-    .bg-animation { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; overflow: hidden; background: radial-gradient(circle, #1a1a2e 0%, #0b0b12 100%); }
-    .suit { position: absolute; font-size: 60px; color: rgba(255, 255, 255, 0.03); animation: floatUp 15s linear infinite; bottom: -100px; }
-    .suit.red { color: rgba(217, 32, 32, 0.05); }
-    @keyframes floatUp { 0% { transform: translateY(0) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translateY(-110vh) rotate(360deg); opacity: 0; } }
-    .suit:nth-child(1) { left: 10%; animation-duration: 12s; }
-    .suit:nth-child(2) { left: 30%; animation-duration: 18s; animation-delay: 3s; font-size: 80px; }
-    .suit:nth-child(3) { left: 50%; animation-duration: 14s; animation-delay: 6s; }
-    .suit:nth-child(4) { left: 70%; animation-duration: 20s; animation-delay: 1s; font-size: 90px; }
-    .suit:nth-child(5) { left: 90%; animation-duration: 16s; animation-delay: 4s; }
+    /* Красивое Лобби */
+    .lobby-bg { background: url('https://www.transparenttextures.com/patterns/stardust.png'), radial-gradient(circle at center, #1f2833 0%, #0b0c10 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .lobby-box { background: rgba(11, 12, 16, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(102, 252, 241, 0.2); border-radius: 15px; padding: 50px; width: 100%; max-width: 400px; box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(102, 252, 241, 0.1); text-align: center; }
+    .lobby-title { color: #66fcf1; font-size: 32px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 3px; font-weight: 800; }
+    .lobby-input { background: rgba(255,255,255,0.05); border: 1px solid #45a29e; color: white; padding: 15px; width: 100%; box-sizing: border-box; border-radius: 8px; font-size: 16px; margin-bottom: 20px; transition: 0.3s; }
+    .lobby-input:focus { outline: none; border-color: #66fcf1; box-shadow: 0 0 15px rgba(102,252,241,0.3); }
+    .lobby-btn { background: #45a29e; color: #0b0c10; width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.3s; }
+    .lobby-btn:hover { background: #66fcf1; transform: translateY(-3px); box-shadow: 0 10px 20px rgba(102,252,241,0.2); }
 
-    /* Меню логина (Glassmorphism) */
-    .login-container { background: rgba(20, 20, 25, 0.85); backdrop-filter: blur(15px); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 20px; padding: 40px; max-width: 450px; margin: 150px auto; text-align: center; box-shadow: 0 0 40px rgba(0, 255, 128, 0.1); }
-    .login-input { background: rgba(0, 0, 0, 0.5); border: 1px solid #444; color: #00ff88; padding: 15px; width: 80%; border-radius: 10px; font-size: 18px; margin-bottom: 25px; outline: none; transition: all 0.3s ease; }
-    .login-input:focus { border-color: #00ff88; box-shadow: 0 0 15px rgba(0, 255, 128, 0.3); }
-    .login-btn { background: linear-gradient(45deg, #2b7a2b, #1e5c1e); color: white; padding: 15px 30px; border: none; border-radius: 10px; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: transform 0.2s; }
-    .login-btn:hover { transform: scale(1.05); }
+    /* Реалистичный стол (Дерево + Сукно) */
+    .table-wood-rim { background: linear-gradient(to bottom, #3b2313, #1c1008); border-radius: 220px; padding: 35px; box-shadow: 0 30px 60px rgba(0,0,0,0.9), inset 0 10px 20px rgba(255,255,255,0.05); max-width: 1100px; margin: 40px auto; position: relative; }
+    .table-felt { background: url('https://www.transparenttextures.com/patterns/felt.png'), radial-gradient(ellipse at center, #1b5e20 0%, #0a2e14 100%); border: 8px solid #111; border-radius: 180px; padding: 60px 40px; box-shadow: inset 0 0 80px rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; position: relative; }
+    
+    /* Карты */
+    .card { background: linear-gradient(to bottom right, #ffffff, #f0f0f0); border-radius: 8px; width: 85px; height: 125px; box-shadow: 3px 5px 15px rgba(0,0,0,0.6); display: inline-flex; flex-direction: column; justify-content: space-between; padding: 5px; font-family: 'Georgia', serif; border: 1px solid #ccc; margin: 0 5px; transition: transform 0.2s; position: relative; }
+    .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 1px solid rgba(255,255,255,0.5); border-radius: 7px; pointer-events: none; }
+    .card:hover { transform: translateY(-15px) scale(1.05); z-index: 10; box-shadow: 5px 15px 25px rgba(0,0,0,0.7); }
+    .card.red { color: #d32f2f; }
+    .card.black { color: #212121; }
+    .card-top { font-size: 20px; font-weight: bold; line-height: 1; text-align: left; }
+    .card-center { font-size: 45px; text-align: center; flex-grow: 1; display: flex; align-items: center; justify-content: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
+    .card-bottom { font-size: 20px; font-weight: bold; line-height: 1; text-align: right; transform: rotate(180deg); }
+    
+    /* Игроки и Банк */
+    .player-seat { background: linear-gradient(145deg, #2a2a2a, #1a1a1a); border: 2px solid #333; padding: 15px 25px; border-radius: 12px; text-align: center; min-width: 130px; box-shadow: 5px 5px 15px rgba(0,0,0,0.5); position: relative; }
+    .player-seat::after { content: ''; position: absolute; top: 2px; left: 2px; right: 2px; bottom: 2px; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; pointer-events: none; }
+    .player-seat.active { border-color: #fbc02d; box-shadow: 0 0 25px rgba(251, 192, 45, 0.4); }
+    .pot-display { font-size: 32px; font-weight: 900; color: #fbc02d; background: rgba(0,0,0,0.7); padding: 10px 30px; border-radius: 30px; border: 2px solid #555; text-shadow: 0 0 10px rgba(251, 192, 45, 0.5); box-shadow: 0 10px 20px rgba(0,0,0,0.6); margin-bottom: 30px; }
+    
+    /* Кнопки действий */
+    .action-btn { color: white; padding: 15px 40px; border: none; border-radius: 30px; margin: 0 10px; cursor: pointer; font-weight: 900; font-size: 16px; letter-spacing: 1px; text-transform: uppercase; box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: 0.2s; }
+    .btn-fold { background: linear-gradient(to bottom, #d32f2f, #b71c1c); }
+    .btn-call { background: linear-gradient(to bottom, #757575, #424242); }
+    .btn-raise { background: linear-gradient(to bottom, #388e3c, #1b5e20); }
+    .action-btn:hover { transform: translateY(-3px); filter: brightness(1.2); }
+    .action-btn:active { transform: translateY(2px); }
 
-    /* Стол и карты */
-    .poker-table { background: radial-gradient(circle, #2e7a48 0%, #11381f 100%); border: 25px solid #3e2723; border-radius: 200px; box-shadow: inset 0 0 50px rgba(0,0,0,0.8), 0 20px 50px rgba(0,0,0,0.9); padding: 50px; max-width: 1000px; margin: 40px auto; position: relative; }
-    .card { background: white; border-radius: 8px; width: 80px; height: 115px; box-shadow: 2px 5px 15px rgba(0,0,0,0.4); display: inline-flex; flex-direction: column; justify-content: space-between; padding: 5px; font-family: 'Times New Roman', serif; border: 1px solid #ddd; margin: 0 -10px; transition: transform 0.2s; }
-    .card:hover { transform: translateY(-10px); z-index: 10; }
-    .card.red { color: #d92020; }
-    .card.black { color: #111; }
-    .card-top { font-size: 18px; font-weight: bold; line-height: 1; text-align: left; }
-    .card-center { font-size: 36px; text-align: center; flex-grow: 1; display: flex; align-items: center; justify-content: center; }
-    .card-bottom { font-size: 18px; font-weight: bold; line-height: 1; text-align: right; transform: rotate(180deg); }
-    
-    .player-seat { background: rgba(0,0,0,0.6); border: 2px solid #555; padding: 15px 25px; border-radius: 50px; text-align: center; min-width: 120px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
-    .player-seat.active { border-color: #f0ad4e; box-shadow: 0 0 20px rgba(240, 173, 78, 0.5); }
-    
     /* Чат */
-    #chat-panel { position: fixed; top: 0; right: -400px; width: 350px; height: 100%; background: #252526; border-left: 1px solid #333; box-shadow: -10px 0 30px rgba(0,0,0,0.8); transition: right 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); z-index: 1000; display: flex; flex-direction: column; }
+    #chat-panel { position: fixed; top: 0; right: -400px; width: 350px; height: 100%; background: #1f2833; border-left: 1px solid #45a29e; box-shadow: -10px 0 30px rgba(0,0,0,0.8); transition: right 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); z-index: 1000; display: flex; flex-direction: column; }
     #chat-panel.open { right: 0; }
-    .chat-header { background: #1e1e1e; padding: 20px; font-size: 18px; font-weight: bold; border-bottom: 1px solid #333; display: flex; justify-content: space-between; }
+    .chat-header { background: #0b0c10; color: #66fcf1; padding: 20px; font-size: 18px; font-weight: bold; border-bottom: 1px solid #45a29e; display: flex; justify-content: space-between; align-items: center; }
     #chat-messages { flex-grow: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-    .chat-btn { position: fixed; bottom: 30px; right: 30px; background: #007acc; color: white; border: none; border-radius: 50px; padding: 15px 25px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(0,122,204,0.4); z-index: 1001; transition: background 0.2s; }
-    .chat-btn:hover { background: #005f9e; }
-    .msg-bot { background: #3a1c1c; border-left: 4px solid #d9534f; padding: 10px; border-radius: 4px; font-size: 14px; }
-    .msg-player { background: #1c2b3a; border-right: 4px solid #5bc0de; padding: 10px; border-radius: 4px; font-size: 14px; text-align: right; }
-""")
-
-chat_script = Script("""
-    function toggleChat() { document.getElementById('chat-panel').classList.toggle('open'); }
+    .chat-btn { position: fixed; bottom: 30px; right: 30px; background: #45a29e; color: #0b0c10; border: none; border-radius: 50px; padding: 15px 25px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(69, 162, 158, 0.4); z-index: 1001; transition: 0.2s; }
+    .chat-btn:hover { background: #66fcf1; }
+    .msg-bot { background: rgba(211, 47, 47, 0.1); border-left: 4px solid #d32f2f; padding: 10px; border-radius: 4px; font-size: 14px; }
+    .msg-player { background: rgba(102, 252, 241, 0.1); border-right: 4px solid #66fcf1; padding: 10px; border-radius: 4px; font-size: 14px; text-align: right; }
 """)
 def BackgroundAnimations():
     return Div(Div("♠", cls="suit"), Div("♥", cls="suit red"), Div("♣", cls="suit"), Div("♦", cls="suit red"), Div("♠", cls="suit"), cls="bg-animation")
@@ -118,50 +120,59 @@ def get(session):
     call_vals = json.dumps({"move": "call", "player": nickname})
     raise_vals = json.dumps ({ "move": "raise", "player": nickname})
     return Html(
-        Head(
-            Title(f"Casino | {hub_name}"), 
+       Head(
+            Title(f"{room} Table"), 
             Script(src="https://unpkg.com/htmx.org@2.0.2"), 
+            Script(src="https://unpkg.com/htmx-ext-ws@2.0.0/ws.js"),
             casino_style, 
             chat_script
         ),
         Body(
             Div(
-                H2(f"♠️ {hub_name} Cluster ♣️", style="margin:0; color: #d4af37; letter-spacing: 2px;"),
-            P(f"Total connections: {visits} | DB Ping: 2ms", style="margin:5px 0 0 0; font-size: 12px; color: #888;"),
-             style="text-align: center; padding: 20px; background: #111; border-bottom: 1px solid #333;"
+                H2(f"Welcome to {room}", style="margin:0; color: #66fcf1; letter-spacing: 2px; text-transform: uppercase;"),
+                P(f"Live Connections: {visits} | Server Health: Excellent", style="margin:5px 0 0 0; font-size: 12px; color: #c5c6c7;"),
+                style="text-align: center; padding: 20px; background: #0b0c10; border-bottom: 2px solid #1f2833;"
             ),
             
             Div(
                 Div(
-                    Div(Div("Bot OOM-Killer", style="font-size: 12px; color: #aaa;"), Div("$1200", style="font-weight: bold;"), cls="player-seat"),
-                Div(Div("SysAdmin", style="font-size: 12px; color: #aaa;"), Div("House Bank", style="font-weight: bold; color: #d4af37;"), cls="player-seat"),
-                  Div(Div("Toxic Senior", style="font-size: 12px; color: #aaa;"), Div("$850", style="font-weight: bold;"), cls="player-seat"),
-                style="display: flex; justify-content: space-around; margin-bottom: 40px; transform: translateY(-30px);"
+                    Div(
+                        Div(
+                            Div(Div("Bot OOM-Killer", style="font-size: 12px; color: #aaa;"), Div("$1200", style="font-weight: bold; color: #fff;"), cls="player-seat"),
+                            Div(Div("SysAdmin", style="font-size: 12px; color: #aaa;"), Div("Dealer", style="font-weight: bold; color: #fbc02d;"), cls="player-seat"),
+                            Div(Div("Toxic Senior", style="font-size: 12px; color: #aaa;"), Div("$850", style="font-weight: bold; color: #fff;"), cls="player-seat"),
+                            style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 40px;"
+                        ),
+                        
+                        Div(f"POT: ${pot}", id="pot-display", cls="pot-display"),
+                        
+                        Div(*board_html, id="board-cards", style="min-height: 130px; display: flex; justify-content: center; margin-bottom: 60px;"),
+                        
+                        # Блок игрока
+                        Div(
+                            Div(Div(f"👤 {nickname}", style="font-size: 12px; color: #aaa;"), Div("$1000", style="font-weight: bold; color: #fff;"), cls="player-seat active", style="margin: 0 auto 20px auto;"),
+                            Div(*my_cards_html, style="display: flex; justify-content: center; margin-bottom: 30px;"),
+                            
+                            # ФОРМА С ЖЕСТКОЙ ЗАЩИТОМ ОТ ПЕРЕЗАГРУЗКИ СТРАНИЦЫ
+                            Form(
+                                Input(type="hidden", name="player", value=nickname),
+                                Input(type="hidden", name="move", id="move-input", value=""),
+                                Button("FOLD", type="submit", onclick="document.getElementById('move-input').value='fold'", cls="action-btn btn-fold"),
+                                Button("CALL", type="submit", onclick="document.getElementById('move-input').value='call'", cls="action-btn btn-call"),
+                                Button("RAISE", type="submit", onclick="document.getElementById('move-input').value='raise'", cls="action-btn btn-raise"),
+                                onsubmit="event.preventDefault();", # ВАЖНО: блокирует перезагрузку!
+                                ws_send=True, 
+                                style="text-align: center;"
+                            ),
+                            style="width: 100%; text-align: center;"
+                        ),
+                        cls="table-felt"
+                    ),
+                    # Вебсокеты теперь подключаются к КОМНАТЕ, а не к контейнеру
+                    hx_ext="ws", ws_connect=f"/ws/hub/{room}" 
                 ),
-                Div(
-                  Div(f"POT: ${pot}", id="pot-display", style="font-size: 28px; font-weight: bold; color: #d4af37; background: rgba(0,0,0,0.5); padding: 5px 20px; border-radius: 20px; display: inline-block; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);"),
-                  Br(),
-                  Div(*board_html, id="board-cards", style="min-height: 120px;"),
-                  style="text-align: center; margin-bottom: 40px;"
-                ),
-        
-                
-                Div(
-                    Div(Div(f"👤 {nickname}", style="font-size: 12px; color: #aaa;"), Div("$1000", style="font-weight: bold;"), cls="player-seat active", style="margin: 0 auto 20px auto; width: fit-content;"),
-                    Div(*my_cards_html, style="margin-bottom: 20px;"),
-                    Form(
-                        Input(type="hidden", name="player", value=nickname),
-                        Button("FOLD", type="submit", onclick="this.form.move.value='fold'", style="background: #a83232; color: white; padding: 12px 30px; border: none; border-radius: 4px; margin: 5px; cursor: pointer; font-weight: bold;"),
-                        Button("CALL", type="submit", onclick="this.form.move.value='call'", style="background: #4a4a4a; color: white; padding: 12px 30px; border: none; border-radius: 4px; margin: 5px; cursor: pointer; font-weight: bold;"),
-                        Button("RAISE", type="submit", onclick="this.form.move.value='raise'", style="background: #2b7a2b; color: white; padding: 12px 30px; border: none; border-radius: 4px; margin: 5px; cursor: pointer; font-weight: bold;"),
-                        Input(type="hidden", name="move", value=""), # Сюда подставится значение кнопки
-                        hx_ext="ws", ws_connect=f"/ws/hub/{hub_name}", ws_send=True, hx_swap="none", # hx_swap="none" спасает от исчезновения
-                        style="text-align: center; transform: translateY(30px);"
-                    )
-                ),
-                cls="poker-table"
+                cls="table-wood-rim"
             ),
-            
             Button("💬 Open Terminal (Chat)", onclick="toggleChat()", cls="chat-btn"),
             
             Div(
