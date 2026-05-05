@@ -65,11 +65,6 @@ casino_style = Style("""
     .chat-btn { position: fixed; bottom: 30px; right: 30px; background: #45a29e; color: #0b0c10; border: none; border-radius: 50px; padding: 15px 25px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 15px rgba(69, 162, 158, 0.4); z-index: 1001; transition: 0.2s; }
     .chat-btn:hover { background: #66fcf1; }
     .msg-bot { background: rgba(211, 47, 47, 0.1); border-left: 4px solid #d32f2f; padding: 10px; border-radius: 4px; font-size: 14px; }
-    Div(
-    Div("D", cls="dealer-chip"), # Вот она, фишка дилера
-    Div(f"POT: ${pot}", id="pot-display", cls="pot-display"),
-    # ... остальной код
-)
     .msg-player { background: rgba(102, 252, 241, 0.1); border-right: 4px solid #66fcf1; padding: 10px; border-radius: 4px; font-size: 14px; text-align: right; }
     .dealer-chip { 
     background: white; color: black; border-radius: 50%; 
@@ -90,7 +85,7 @@ def PokerCard(rank, suit, color_class):
         Div(f"{rank}{suit}", cls="card-bottom"),
         cls=f"card {color_class}"
     )
-@rt('/login')
+
 @rt('/login')
 def post(session, nickname: str, room_choice: str): 
     session['nickname'] = nickname
@@ -122,9 +117,10 @@ def get(session):
         
     nickname = session['nickname']
     room = session.get('room_id', 'Lobby')
+    room = session.get('room_id', 'Vegas')
     chat_script = Script("function toggleChat() { document.getElementById('chat-panel').classList.toggle('open'); }")
     visits = r.incr('visits')
-    pot_key = f'hub:{hub_name}:pot_v2'
+    pot_key = f'hub:{hub_name}:game_state_v2'
     if not r.exists(pot_key):
         r.set(pot_key, 0)
     pot = r.get(pot_key)
@@ -160,12 +156,13 @@ def get(session):
             Div(
                 Div(
                     Div(
-                        Div(
-                            Div(Div("Bot OOM-Killer", style="font-size: 12px; color: #aaa;"), Div("$1200", style="font-weight: bold; color: #fff;"), cls="player-seat"),
-                            Div(Div("SysAdmin", style="font-size: 12px; color: #aaa;"), Div("Dealer", style="font-weight: bold; color: #fbc02d;"), cls="player-seat"),
-                            Div(Div("Toxic Senior", style="font-size: 12px; color: #aaa;"), Div("$850", style="font-weight: bold; color: #fff;"), cls="player-seat"),
-                            style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 40px;"
-                        ),
+                       Div(
+    Div("D", cls="dealer-chip"), 
+    Div(Div("Bot OOM-Killer", style="font-size: 12px; color: #aaa;"), Div("$1200", style="font-weight: bold; color: #fff;"), cls="player-seat"),
+    Div(Div("SysAdmin", style="font-size: 12px; color: #aaa;"), Div("HOST", style="font-weight: bold; color: #fbc02d;"), cls="player-seat"),
+    Div(Div("Toxic Senior", style="font-size: 12px; color: #aaa;"), Div("$850", style="font-weight: bold; color: #fff;"), cls="player-seat"),
+    style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 40px; position: relative;"
+),
                         
                         Div(f"POT: ${pot}", id="pot-display", cls="pot-display"),
                         
@@ -216,7 +213,7 @@ async def ws_action(msg: str, send, hub_id: str):
         player_name = data.get('player', 'Anonymus')
         if not move:
             return  
-        pot_key = f'hub:{hub_id}:pot_v2'
+        pot_key = f'hub:{hub_id}:game_state_v2'
         pot = int(r.get(pot_key) or "0")
         bot_response = ""
         update_board = ""
