@@ -1,5 +1,6 @@
 import random 
 import json
+from collections import Counter
 SUITS = ['♠', '♥', '♦', '♣']
 RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
 
@@ -48,12 +49,16 @@ def deal_preflop(live_player_names):
         'hands': hands,
         'board': [],
         'deck': deck,
-        'phase': 'preflop'
+        'phase': 'preflop',
+        'bot_folded': {'Toxic Senior': False, 'OOM-Killer': False},  
+        'dealer_log': ["Dealer: Cards have been dealt. Preflop begins!"]  
+
     }
 def deal_next_phase(game_state):
     deck = game_state['deck']
     board = game_state['board']
     phase = game_state['phase']
+    log = game_state.get('dealer_log', [])
     if phase == 'preflop':
         board.extend([deck.pop(), deck.pop(), deck.pop()])
         game_state['phase'] = 'flop' 
@@ -66,19 +71,81 @@ def deal_next_phase(game_state):
     game_state['deck'] = deck
     game_state['board'] = board
     return game_state
+def evaluate_hand_strength(hole_cards,board_cards):
+    all_cards = hole_cards + board_cards
+    ranks = [RANK_VALUES[c['rank']] for c in all_cards]
+    suits = [c['suit'] for c in all_cards]
+    rank_counts = Counter(ranks)
+    suit_counts = Counter(suits)
+    counts = sorted(rank_counts.values(), reverse=True)
+    is_flush = any(v >=5 for v in suit_counts.values())
+    sorted_ranks = sorted(set(ranks))
+    is_straight = any(
+        sorted_ranks[i+4] - sorted_ranks[i] == 4 and len(sorted_ranks[i:i+5]) == 5
+        for i in range(len(sorted_ranks) - 4)
+    )
+
+    if is_straight and is_flush:
+        return 8 #straight flush
+    if counts[0] == 4:
+        return 7 
+    if counts[0] == 3 and counts == 2:
+        return 6
+    if is_flush:
+        return 5
+    if is_straight:
+        return 4
+    if counts[0] == 3:
+        return 3
+    if counts[0] == 2 and counts[1] == 2:
+        return 2
+    if counts[0] == 2:
+        return 1
+    return 0
+
+def preflop_strength(hole_cards):
+    r1 = RANK_VALUES[hole_cards[0]['rank']]
+    r2 = RANK_VALUES[hole_cards[0]['rank']]
+    suited = hole_cards[0]['suit'] == hole_cards[1]['suit']
+    high = max(r1, r2)
+    low = min(r1, r2)
+    score = (high + low) / 26.0
+    if r1 == r2:
+        score += 0.2
+    if suited:
+        score += 0.05
+    return min(score, 1.0)
+
 def bot_decide_move(bot_name, bot_cards, board_cards, current_pot, current_bet):
-    """
-    В будущем бот будет смотреть на свои карты и решать: Фолд, Колл или Рейз.
-    Пока что они всегда делают CALL (чтобы игра не ломалась), но говорят твои крутые фразы.
-    """
-    # ... здесь будет математика покера ...
-    
-    move = "call" 
-    
-    # Выбираем фразу
-    if bot_name == "Toxic Senior":
-        phrase = random.choice(TOXIC_CALL)
+    if board_cards:
+        strength = evaluate_hand_strength(bot_cards, board_cards) / 8.0
     else:
-        phrase = random.choice(OOM_ALLIN) if current_pot > 500 else random.choice(OOM_CALL_PHRASES)
+        strength = preflop_strength(bot_cards)
+
+    
+    rand = random.random()
+
+    if bot_name == "Toxic Senior":
         
+        if strength < 0.25 and rand < 0.6:
+            move = "fold"
+            phrase = random.choice(TOXIC_FOLD_RESPONSE)
+        elif strength > 0.6 and rand < 0.5:
+            move = "raise"
+            phrase = random.choice(TOXIC_RAISE)
+        else:
+            move = "call"
+            phrase = random.choice(TOXIC_CALL)
+    else:
+      
+        if current_pot > 500 or strength > 0.75:
+            move = "raise"
+            phrase = random.choice(OOM_ALLIN)
+        elif strength < 0.2 and rand < 0.4:
+            move = "fold"
+            phrase = random.choice(OOM_FOLD_PHRASES)
+        else:
+            move = "call"
+            phrase = random.choice(OOM_CALL_PHRASES if current_pot <= 500 else OOM_RAISE_PHRASES)
+
     return {"move": move, "phrase": phrase}

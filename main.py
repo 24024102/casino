@@ -10,78 +10,252 @@ app, rt = fast_app(secret_key="1234")
 hub_connections = {}
 async def broadcast_to_hub(hub_id, message):
     if hub_id in hub_connections:
+        dead = []
         for client_send in hub_connections[hub_id]:
             try:
                 await client_send(message)
             except Exception:
-                pass
-        
-
-
-casino_style = Style("""
-    body { background-color: #0b0c10; color: #c5c6c7; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; overflow-x: hidden; }
-    
-    
-    .lobby-bg { background: url('https://www.transparenttextures.com/patterns/stardust.png'), radial-gradient(circle at center, #1f2833 0%, #0b0c10 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-    .lobby-box { background: rgba(11, 12, 16, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(102, 252, 241, 0.2); border-radius: 15px; padding: 50px; width: 100%; max-width: 400px; box-shadow: 0 20px 50px rgba(0,0,0,0.8), 0 0 30px rgba(102, 252, 241, 0.1); text-align: center; }
-    .lobby-title { color: #66fcf1; font-size: 32px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 3px; font-weight: 800; }
-    .lobby-input { background: rgba(255,255,255,0.05); border: 1px solid #45a29e; color: white; padding: 15px; width: 100%; box-sizing: border-box; border-radius: 8px; font-size: 16px; margin-bottom: 20px; transition: 0.3s; }
-    .lobby-input:focus { outline: none; border-color: #66fcf1; box-shadow: 0 0 15px rgba(102,252,241,0.3); }
-    .lobby-btn { background: #45a29e; color: #0b0c10; width: 100%; padding: 15px; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; text-transform: uppercase; transition: 0.3s; }
-    .lobby-btn:hover { background: #66fcf1; transform: translateY(-3px); box-shadow: 0 10px 20px rgba(102,252,241,0.2); }
-
-  
-    .table-wood-rim { background: linear-gradient(to bottom, #3b2313, #1c1008); border-radius: 220px; padding: 35px; box-shadow: 0 30px 60px rgba(0,0,0,0.9), inset 0 10px 20px rgba(255,255,255,0.05); max-width: 1100px; margin: 40px auto; position: relative; }
-    .table-felt { background: url('https://www.transparenttextures.com/patterns/felt.png'), radial-gradient(ellipse at center, #1b5e20 0%, #0a2e14 100%); border: 8px solid #111; border-radius: 180px; padding: 60px 40px; box-shadow: inset 0 0 80px rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; position: relative; }
-    
-    
-    .card { background: linear-gradient(to bottom right, #ffffff, #f0f0f0); border-radius: 8px; width: 85px; height: 125px; box-shadow: 3px 5px 15px rgba(0,0,0,0.6); display: inline-flex; flex-direction: column; justify-content: space-between; padding: 5px; font-family: 'Georgia', serif; border: 1px solid #ccc; margin: 0 5px; transition: transform 0.2s; position: relative; }
-    .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 1px solid rgba(255,255,255,0.5); border-radius: 7px; pointer-events: none; }
-    .card:hover { transform: translateY(-15px) scale(1.05); z-index: 10; box-shadow: 5px 15px 25px rgba(0,0,0,0.7); }
-    .card.red { color: #d32f2f; }
-    .card.black { color: #212121; }
-    .card-top { font-size: 20px; font-weight: bold; line-height: 1; text-align: left; }
-    .card-center { font-size: 45px; text-align: center; flex-grow: 1; display: flex; align-items: center; justify-content: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
-    .card-bottom { font-size: 20px; font-weight: bold; line-height: 1; text-align: right; transform: rotate(180deg); }
-
-    
-    .player-seat { background: linear-gradient(145deg, #2a2a2a, #1a1a1a); border: 2px solid #333; padding: 15px 25px; border-radius: 12px; text-align: center; min-width: 130px; box-shadow: 5px 5px 15px rgba(0,0,0,0.5); position: relative; }
-    .player-seat::after { content: ''; position: absolute; top: 2px; left: 2px; right: 2px; bottom: 2px; border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; pointer-events: none; }
-    .player-seat.active { border-color: #fbc02d; box-shadow: 0 0 25px rgba(251, 192, 45, 0.4); }
-    .pot-display { font-size: 32px; font-weight: 900; color: #fbc02d; background: rgba(0,0,0,0.7); padding: 10px 30px; border-radius: 30px; border: 2px solid #555; text-shadow: 0 0 10px rgba(251, 192, 45, 0.5); box-shadow: 0 10px 20px rgba(0,0,0,0.6); margin-bottom: 30px; }
-    
-    .action-btn { color: white; padding: 15px 40px; border: none; border-radius: 30px; margin: 0 10px; cursor: pointer; font-weight: 900; font-size: 16px; letter-spacing: 1px; text-transform: uppercase; box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: 0.2s; }
-    .btn-fold { background: linear-gradient(to bottom, #d32f2f, #b71c1c); }
-    .btn-call { background: linear-gradient(to bottom, #757575, #424242); }
-    .btn-raise { background: linear-gradient(to bottom, #388e3c, #1b5e20); }
-    .action-btn:hover { transform: translateY(-3px); filter: brightness(1.2); }
-    .action-btn:active { transform: translateY(2px); }
-
-   
-    #chat-panel { position: fixed; top: 0; right: -400px; width: 350px; height: 100%; background: #1f2833; border-left: 1px solid #45a29e; box-shadow: -10px 0 30px rgba(0,0,0,0.8); transition: right 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); z-index: 1000; display: flex; flex-direction: column; }
-   
-    .dealer-chip { 
-        background: white; color: black; border-radius: 50%; 
-        width: 35px; height: 35px; display: flex; 
-        align-items: center; justify-content: center; 
-        font-weight: bold; position: absolute; 
-        top: 20px; left: 50%; transform: translateX(-50%);
-        border: 2px solid #555; box-shadow: 0 4px 10px rgba(0,0,0,0.5); 
-        z-index: 10;
+                dead.append(client_send)
+        for d in dead:
+            hub_connections[hub_id].remove(d)
+chat_script = Script("""
+    function toggleChat() {
+        const panel = document.getElementById('chat-panel');
+        const isOpen = panel.style.right === '0px';
+        panel.style.right = isOpen ? '-400px' : '0px';
     }
-    .action-btn { 
-        color: white; padding: 15px 40px; border: none; 
-        border-radius: 30px; margin: 0 10px; cursor: pointer; 
-        font-weight: 900; font-size: 16px; text-transform: uppercase; 
-        box-shadow: 0 5px 15px rgba(0,0,0,0.5); transition: 0.2s; 
-    }
-    .btn-fold { background: linear-gradient(to bottom, #d32f2f, #b71c1c); }
-    .btn-call { background: linear-gradient(to bottom, #757575, #424242); }
-    .btn-raise { background: linear-gradient(to bottom, #388e3c, #1b5e20); }
-    
+    // Auto-scroll chat to bottom
+    const chatObs = new MutationObserver(() => {
+        const msgs = document.getElementById('chat-messages');
+        if (msgs) msgs.scrollTop = msgs.scrollHeight;
+    });
+    document.addEventListener('DOMContentLoaded', () => {
+        const msgs = document.getElementById('chat-messages');
+        if (msgs) chatObs.observe(msgs, { childList: true, subtree: true });
+    });
 """)
-def BackgroundAnimations():
-    return Div(Div("♠", cls="suit"), Div("♥", cls="suit red"), Div("♣", cls="suit"), Div("♦", cls="suit red"), Div("♠", cls="suit"), cls="bg-animation")
+casino_style = Style("""
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap');
+
+    :root {
+        --gold: #d4af37;
+        --gold-light: #f0d060;
+        --felt: #0a3d1f;
+        --felt-light: #1b5e20;
+        --dark: #0b0c10;
+        --panel: #111418;
+        --border: rgba(212,175,55,0.3);
+        --text: #c5c6c7;
+    }
+
+    * { box-sizing: border-box; }
+    body { background: var(--dark); color: var(--text); font-family: 'Crimson Pro', Georgia, serif; margin: 0; padding: 0; overflow-x: hidden; }
+
+    /* ── LOBBY ── */
+    .lobby-bg {
+        min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        background: radial-gradient(ellipse at 30% 60%, #1a0a00 0%, #0b0c10 70%);
+        position: relative; overflow: hidden;
+    }
+    .lobby-bg::before {
+        content: '♠  ♥  ♦  ♣';
+        position: absolute; font-size: 200px; color: rgba(212,175,55,0.03);
+        letter-spacing: 40px; white-space: nowrap; top: 50%; left: 50%;
+        transform: translate(-50%, -50%) rotate(-15deg);
+        font-family: 'Cinzel', serif; pointer-events: none;
+    }
+    .lobby-box {
+        background: rgba(10, 12, 16, 0.97);
+        border: 1px solid var(--border);
+        border-top: 3px solid var(--gold);
+        border-radius: 4px;
+        padding: 60px 50px 50px;
+        width: 420px;
+        box-shadow: 0 40px 80px rgba(0,0,0,0.9), 0 0 60px rgba(212,175,55,0.08);
+        position: relative;
+    }
+    .lobby-box::after {
+        content: '';
+        position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+        width: 60px; height: 3px;
+        background: var(--gold);
+    }
+    .lobby-crest { font-size: 40px; margin-bottom: 10px; text-align: center; }
+    .lobby-title {
+        color: var(--gold); font-family: 'Cinzel', serif;
+        font-size: 22px; font-weight: 900; letter-spacing: 6px;
+        margin-bottom: 6px; text-align: center; text-transform: uppercase;
+    }
+    .lobby-subtitle {
+        color: rgba(212,175,55,0.45); font-size: 12px; letter-spacing: 3px;
+        text-align: center; margin-bottom: 40px; text-transform: uppercase;
+    }
+    .lobby-label { color: rgba(255,255,255,0.4); font-size: 11px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; display: block; }
+    .lobby-input {
+        background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+        border-bottom: 1px solid var(--gold); color: white; padding: 14px 16px;
+        width: 100%; border-radius: 2px; font-size: 16px; font-family: 'Crimson Pro', serif;
+        margin-bottom: 24px; transition: 0.3s; outline: none;
+    }
+    .lobby-input:focus { border-color: var(--gold); background: rgba(212,175,55,0.05); box-shadow: 0 4px 20px rgba(212,175,55,0.1); }
+    .lobby-room-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 30px; }
+    .lobby-room-card {
+        border: 1px solid rgba(255,255,255,0.1); border-radius: 4px; padding: 14px 8px;
+        text-align: center; cursor: pointer; transition: 0.25s; background: rgba(255,255,255,0.02);
+        position: relative;
+    }
+    .lobby-room-card input[type=radio] { display: none; }
+    .lobby-room-card:hover { border-color: var(--gold); background: rgba(212,175,55,0.06); }
+    .lobby-room-card.selected { border-color: var(--gold); background: rgba(212,175,55,0.1); }
+    .lobby-room-card .room-icon { font-size: 24px; margin-bottom: 6px; }
+    .lobby-room-card .room-name { font-family: 'Cinzel', serif; font-size: 11px; letter-spacing: 2px; color: var(--gold); }
+    .lobby-room-card .room-tag { font-size: 10px; color: rgba(255,255,255,0.3); margin-top: 2px; }
+    .lobby-btn {
+        background: var(--gold); color: #000; font-family: 'Cinzel', serif;
+        font-weight: 700; font-size: 13px; padding: 16px; width: 100%;
+        border-radius: 2px; border: none; cursor: pointer; letter-spacing: 3px;
+        text-transform: uppercase; transition: 0.3s;
+    }
+    .lobby-btn:hover { background: var(--gold-light); box-shadow: 0 8px 30px rgba(212,175,55,0.3); transform: translateY(-1px); }
+
+    /* ── TOP NAV ── */
+    .top-nav {
+        background: rgba(10,10,14,0.98); padding: 0 30px;
+        display: flex; justify-content: space-between; align-items: center;
+        border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100;
+        height: 60px; backdrop-filter: blur(10px);
+    }
+    .nav-brand { font-family: 'Cinzel', serif; color: var(--gold); font-size: 16px; letter-spacing: 4px; }
+    .hub-links { display: flex; gap: 4px; }
+    .hub-links a {
+        color: rgba(255,255,255,0.4); text-decoration: none; padding: 8px 16px;
+        font-family: 'Cinzel', serif; font-size: 11px; letter-spacing: 2px;
+        text-transform: uppercase; transition: 0.2s; border-radius: 2px;
+        border: 1px solid transparent;
+    }
+    .hub-links a:hover { color: var(--gold); border-color: var(--border); }
+    .hub-links a.active { color: var(--gold); border-color: var(--gold); background: rgba(212,175,55,0.08); }
+    .nav-profile { color: rgba(255,255,255,0.5); font-size: 13px; letter-spacing: 1px; }
+    .nav-profile span { color: var(--gold); }
+
+    /* ── TABLE ── */
+    .page-wrap { padding: 30px 20px; min-height: calc(100vh - 60px); display: flex; flex-direction: column; align-items: center; gap: 20px; }
+    .table-wood-rim {
+        background: linear-gradient(135deg, #2a1505, #0d0600 60%, #1a0a02);
+        border-radius: 200px; padding: 28px;
+        box-shadow: 0 40px 80px rgba(0,0,0,0.95), inset 0 2px 4px rgba(255,255,255,0.05), 0 0 0 2px rgba(212,175,55,0.1);
+        width: 100%; max-width: 1050px;
+    }
+    .table-felt {
+        background: radial-gradient(ellipse at center, #1a5c2a 0%, var(--felt) 70%, #061008 100%);
+        border-radius: 170px; padding: 50px 50px 40px;
+        box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+        display: flex; flex-direction: column; align-items: center;
+        position: relative; min-height: 420px;
+    }
+    .phase-badge {
+        position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+        background: rgba(0,0,0,0.7); border: 1px solid var(--border);
+        color: var(--gold); font-family: 'Cinzel', serif; font-size: 10px;
+        letter-spacing: 3px; padding: 5px 16px; border-radius: 20px; text-transform: uppercase;
+    }
+    .players-row { display: flex; gap: 16px; justify-content: center; width: 100%; margin-bottom: 30px; flex-wrap: wrap; }
+    .player-seat {
+        background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.08);
+        padding: 12px 20px; border-radius: 8px; text-align: center; min-width: 120px;
+        transition: 0.3s; position: relative;
+    }
+    .player-seat.active { border-color: var(--gold); box-shadow: 0 0 20px rgba(212,175,55,0.3); }
+    .player-seat.bot-seat { border-color: rgba(255,80,80,0.3); }
+    .player-name { font-size: 13px; color: #aaa; margin-bottom: 4px; }
+    .player-chips { font-family: 'Cinzel', serif; color: var(--gold); font-size: 15px; font-weight: 700; }
+    .player-status { font-size: 10px; color: rgba(255,255,255,0.3); margin-top: 3px; letter-spacing: 1px; }
+
+    .pot-display {
+        font-family: 'Cinzel', serif; font-size: 26px; font-weight: 900;
+        color: var(--gold); text-shadow: 0 0 20px rgba(212,175,55,0.5);
+        margin-bottom: 20px; letter-spacing: 2px;
+    }
+
+    /* ── CARDS ── */
+    .board-area { display: flex; justify-content: center; gap: 8px; min-height: 130px; margin-bottom: 30px; align-items: center; }
+    .card {
+        background: linear-gradient(135deg, #fff 0%, #f5f5f5 100%);
+        border-radius: 8px; width: 80px; height: 115px;
+        box-shadow: 3px 6px 20px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.8);
+        display: inline-flex; flex-direction: column; justify-content: space-between;
+        padding: 6px; font-family: 'Cinzel', serif; border: 1px solid #ddd;
+        margin: 0; transition: transform 0.2s; position: relative;
+        animation: cardDeal 0.3s ease-out;
+    }
+    @keyframes cardDeal { from { opacity: 0; transform: translateY(-20px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    .card:hover { transform: translateY(-12px) scale(1.05); z-index: 10; }
+    .card.red { color: #c62828; }
+    .card.black { color: #1a1a1a; }
+    .card-top { font-size: 16px; font-weight: 700; line-height: 1; }
+    .card-center { font-size: 38px; text-align: center; flex-grow: 1; display: flex; align-items: center; justify-content: center; }
+    .card-bottom { font-size: 16px; font-weight: 700; line-height: 1; text-align: right; transform: rotate(180deg); }
+    .card-back {
+        background: linear-gradient(135deg, #1a237e, #283593);
+        border-radius: 8px; width: 80px; height: 115px;
+        box-shadow: 3px 6px 20px rgba(0,0,0,0.7);
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 30px; border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    /* ── ACTIONS ── */
+    .my-hand-area { width: 100%; text-align: center; }
+    .my-cards { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+    .action-bar { display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; }
+    .action-btn {
+        color: white; padding: 13px 32px; border: none; border-radius: 3px;
+        cursor: pointer; font-family: 'Cinzel', serif; font-weight: 700;
+        font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5); transition: 0.15s;
+        border-bottom: 3px solid rgba(0,0,0,0.3);
+    }
+    .btn-fold { background: linear-gradient(to bottom, #c62828, #8b1a1a); }
+    .btn-call { background: linear-gradient(to bottom, #455a64, #263238); }
+    .btn-raise { background: linear-gradient(to bottom, #2e7d32, #1b5e20); }
+    .action-btn:hover { transform: translateY(-2px); filter: brightness(1.15); }
+    .action-btn:active { transform: translateY(1px); filter: brightness(0.9); }
+
+    /* ── DEALER LOG ── [NEW] */
+    .dealer-log {
+        background: rgba(0,0,0,0.5); border: 1px solid var(--border);
+        border-radius: 4px; padding: 12px 18px; width: 100%; max-width: 1050px;
+        font-size: 13px; color: rgba(212,175,55,0.8);
+    }
+    .dealer-log-title { font-family: 'Cinzel', serif; font-size: 10px; letter-spacing: 3px; color: rgba(212,175,55,0.4); margin-bottom: 8px; text-transform: uppercase; }
+    .dealer-log-entry { padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+
+    /* ── CHAT ── */
+    .chat-btn {
+        position: fixed; bottom: 30px; right: 30px; z-index: 999;
+        background: var(--gold); color: #000; border: none; border-radius: 50px;
+        padding: 12px 22px; font-family: 'Cinzel', serif; font-size: 12px;
+        letter-spacing: 2px; cursor: pointer; box-shadow: 0 8px 25px rgba(212,175,55,0.4);
+        transition: 0.2s;
+    }
+    .chat-btn:hover { transform: translateY(-2px); background: var(--gold-light); }
+    #chat-panel {
+        position: fixed; top: 0; right: -400px; width: 360px; height: 100%;
+        background: #0e1014; border-left: 1px solid var(--border);
+        box-shadow: -10px 0 40px rgba(0,0,0,0.8);
+        transition: right 0.3s ease; z-index: 1000;
+        display: flex; flex-direction: column;
+    }
+    .chat-header {
+        padding: 20px; border-bottom: 1px solid var(--border);
+        font-family: 'Cinzel', serif; color: var(--gold); font-size: 13px; letter-spacing: 3px;
+    }
+    #chat-messages { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+    .msg-player { background: rgba(212,175,55,0.08); border-left: 2px solid var(--gold); padding: 8px 12px; border-radius: 0 4px 4px 0; font-size: 14px; }
+    .msg-bot { background: rgba(255,80,80,0.06); border-left: 2px solid #c62828; padding: 8px 12px; border-radius: 0 4px 4px 0; font-size: 13px; color: #ccc; }
+    .msg-dealer { background: rgba(0,150,0,0.08); border-left: 2px solid #2e7d32; padding: 8px 12px; border-radius: 0 4px 4px 0; font-size: 13px; color: #a5d6a7; }
+""")
+
+
 
 def PokerCard(rank, suit, color_class):
     return Div(
@@ -90,153 +264,302 @@ def PokerCard(rank, suit, color_class):
         Div(f"{rank}{suit}", cls="card-bottom"),
         cls=f"card {color_class}"
     )
+def CardBack():
+    return Div("🂠", cls="card-back")
 
 @rt('/login')
 def post(session, nickname: str, room_choice: str): 
     session['nickname'] = nickname
     session['room_id'] = room_choice
     return RedirectResponse('/', status_code=303)
+@rt('/switch/{new_room}')
+def switch_room(session, new_room: str):
+    session['room_id'] = new_room
+    return RedirectResponse('/', status_code=303)
 
 @rt('/')
 def get(session):
     if 'nickname' not in session:
         return Html(
-            Head(Title("Login | Casino"), casino_style),
+            Head(Title("High Stakes Casino"), casino_style),
             Body(
                 Div(
-                    Form(
-    Input(type="text", name="nickname", placeholder="Твой ник...", required=True, cls="lobby-input"),
-    Select(
-        Option("💎 Las Vegas", value="Vegas"),
-        Option("🏎️ Monaco", value="Monaco"),
-        Option("🏮 Macau", value="Macau"),
-        name="room_choice", cls="lobby-input"
-    ),
-    Button("JOIN TABLE", type="submit", cls="lobby-btn"),
-    action="/login", method="post"
-)
+                    Div(
+                        Div("♠", cls="lobby-crest"),
+                        Div("HIGH STAKES", cls="lobby-title"),
+                        Div("PRIVATE MEMBERS CLUB", cls="lobby-subtitle"),
+                        Form(
+                            Label("Your Alias", cls="lobby-label"),
+                            Input(type="text", name="nickname", placeholder="e.g. The Shark...", required=True, cls="lobby-input"),
+                            Label("Select Table", cls="lobby-label"),
+                            # [NEW] Card-style room selector
+                            Div(
+                                Label(
+                                    Input(type="radio", name="room_choice", value="Vegas", checked=True),
+                                    Div("🎰", cls="room-icon"),
+                                    Div("Las Vegas", cls="room-name"),
+                                    Div("VIP", cls="room-tag"),
+                                    cls="lobby-room-card selected", id="room-Vegas",
+                                    onclick="selectRoom('Vegas')"
+                                ),
+                                Label(
+                                    Input(type="radio", name="room_choice", value="Monaco"),
+                                    Div("🎭", cls="room-icon"),
+                                    Div("Monaco", cls="room-name"),
+                                    Div("PRO", cls="room-tag"),
+                                    cls="lobby-room-card", id="room-Monaco",
+                                    onclick="selectRoom('Monaco')"
+                                ),
+                                Label(
+                                    Input(type="radio", name="room_choice", value="Macau"),
+                                    Div("🐉", cls="room-icon"),
+                                    Div("Macau", cls="room-name"),
+                                    Div("CLASSIC", cls="room-tag"),
+                                    cls="lobby-room-card", id="room-Macau",
+                                    onclick="selectRoom('Macau')"
+                                ),
+                                cls="lobby-room-grid"
+                            ),
+                            Button("ENTER THE CLUB →", type="submit", cls="lobby-btn"),
+                            action="/login", method="post"
+                        ),
+                        cls="lobby-box"
                     ),
-                    cls="login-container"
+                    cls="lobby-bg"
+                ),
+                Script("""
+                    function selectRoom(name) {
+                        document.querySelectorAll('.lobby-room-card').forEach(el => el.classList.remove('selected'));
+                        document.getElementById('room-' + name).classList.add('selected');
+                        document.querySelector('input[value=' + name + ']').checked = true;
+                    }
+                """)
             )
-            )
-        
+        )
+
     nickname = session['nickname']
     room = session.get('room_id', 'Vegas')
-    chat_script = Script("function toggleChat() { document.getElementById('chat-panel').classList.toggle('open'); }")
-    visits = r.incr('visits')
-    pot_key = f'room:{room}:pot'
-    if not r.exists(pot_key):
+    pot_key   = f'room:{room}:pot'
+    state_key = f'room:{room}:state'
+    if not r.exists(state_key):
+        init_state = engine.deal_preflop([nickname])
+        r.set(state_key, json.dumps(init_state))
         r.set(pot_key, 0)
-    pot = r.get(pot_key)
-    raw_hand = r.get('game_state_v2')
-    if not raw_hand:
-       new_hand = engine.deal_preflop([nickname])
-       raw_hand = json.dumps(new_hand)
-       r.set('game_state_v2', raw_hand)
-    hand = json.loads(str(raw_hand))
-    board_html = [PokerCard(c['rank'], c['suit'], c['color']) for c in hand['board']]
-    my_cards_html = [PokerCard(c['rank'], c['suit'], c['color']) for c in hand['hands'].get(nickname, [])]
-    fold_vals = json.dumps({"move": "fold", "player": nickname})
-    call_vals = json.dumps({"move": "call", "player": nickname})
-    raise_vals = json.dumps ({ "move": "raise", "player": nickname})
-    return Html(
-         Head(
-            Title(f"{hub_name} Table"), 
-            Script(src="https://unpkg.com/htmx.org@2.0.2"), 
-            Script(src="https://unpkg.com/htmx-ext-ws@2.0.0/ws.js"),
+    state = json.loads(r.get(state_key))
+    if nickname not in state.get('hands', {}):
+        state['hands'][nickname] = []
+        r.set(state_key, json.dumps(state))
+    pot   = r.get(pot_key) or "0"
+    phase = state.get('phase', 'preflop')
+    player_slots = []
+    for p, cards in state.get('hands', {}).items():
+        if p in ('Toxic Senior', 'OOM-Killer'):
+            folded = state.get('bot_folded', {}).get(p, False)
+            player_slots.append(Div(
+                Div(f"🤖 {p}", cls="player-name"),
+                Div("$1,000", cls="player-chips"),
+                Div("FOLDED" if folded else "IN HAND", cls="player-status"),
+                cls="player-seat bot-seat"
+            ))
+        else:
+            player_slots.append(Div(
+                Div(f"👤 {p}", cls="player-name"),
+                Div("$1,000", cls="player-chips"),
+                Div("YOU" if p == nickname else "PLAYER", cls="player-status"),
+                cls=f"player-seat {'active' if p == nickname else ''}"
+            ))
 
-            chat_script, 
+    board_cards   = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('board', [])]
+    my_hole_cards = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('hands', {}).get(nickname, [])]
+    log_entries   = state.get('dealer_log', ['🃏 Dealer: Welcome to the table.'])
+    top_nav = Div(
+        Div("♠ CASINO NETWORK", cls="nav-brand"),
+        Div(
+            A("Las Vegas", href="/switch/Vegas", cls="active" if room == "Vegas" else ""),
+            A("Monaco",   href="/switch/Monaco", cls="active" if room == "Monaco" else ""),
+            A("Macau",    href="/switch/Macau",  cls="active" if room == "Macau"  else ""),
+            cls="hub-links"
+        ),
+        Div("Playing as: ", Span(nickname), cls="nav-profile"),
+        cls="top-nav"
+    )
+
+    return Html(
+        Head(
+            Title(f"{room} — High Stakes"),
+            Script(src="https://unpkg.com/htmx.org@2.0.2"),
+            Script(src="https://unpkg.com/htmx-ext-ws@2.0.0/ws.js"),
+            chat_script,
             casino_style
         ),
-      Body(
-            BackgroundAnimations(),
-            Div(
-                H2(f"Welcome to {hub_name}", style="margin:0; color: #66fcf1; letter-spacing: 2px; text-transform: uppercase;"),
-                P(f"Live Connections: {visits} | Server Health: Excellent", style="margin:5px 0 0 0; font-size: 12px; color: #c5c6c7;"),
-                style="text-align: center; padding: 20px; background: rgba(11, 12, 16, 0.9); border-bottom: 2px solid #1f2833;"
-            ),
-            # Стол
+        Body(
+            top_nav,  
             Div(
                 Div(
                     Div(
-                        Div(
-                            Div("D", cls="dealer-chip"), 
-                            Div(Div("Bot OOM-Killer", style="font-size: 12px; color: #aaa;"), Div("$1200", style="font-weight: bold; color: #fff;"), cls="player-seat"),
-                            Div(Div("SysAdmin", style="font-size: 12px; color: #aaa;"), Div("HOST", style="font-weight: bold; color: #fbc02d;"), cls="player-seat"),
-                            Div(Div("Toxic Senior", style="font-size: 12px; color: #aaa;"), Div("$850", style="font-weight: bold; color: #fff;"), cls="player-seat"),
-                            style="display: flex; justify-content: space-between; width: 100%; margin-bottom: 40px; position: relative;"
-                        ),
-                        
+                       
+                        Div(phase.upper(), cls="phase-badge", id="phase-badge"),
+                        Div(*player_slots, id="players-row", cls="players-row"),
                         Div(f"POT: ${pot}", id="pot-display", cls="pot-display"),
-                        Div(*board_html, id="board-cards", style="min-height: 130px; display: flex; justify-content: center; margin-bottom: 60px;"),
+                        Div(*board_cards, id="board-cards", cls="board-area"),
                         Div(
-                            Div(Div(f"👤 {nickname}", style="font-size: 12px; color: #aaa;"), Div("$1000", style="font-weight: bold; color: #fff;"), cls="player-seat active", style="margin: 0 auto 20px auto; width: fit-content;"),
-                            Div(*my_cards_html, style="display: flex; justify-content: center; margin-bottom: 30px;"),
+                            Div(*my_hole_cards, cls="my-cards"),
                             Form(
                                 Input(type="hidden", name="player", value=nickname),
                                 Input(type="hidden", name="move", id="move-input", value=""),
-                                Button("FOLD", type="submit", onclick="document.getElementById('move-input').value='fold'", cls="action-btn btn-fold"),
-                                Button("CALL", type="submit", onclick="document.getElementById('move-input').value='call'", cls="action-btn btn-call"),
-                                Button("RAISE", type="submit", onclick="document.getElementById('move-input').value='raise'", cls="action-btn btn-raise"),
-                                onsubmit="event.preventDefault();", ws_send=True, 
-                                style="text-align: center;"
+                                Div(
+                                    Button("FOLD",  type="submit",
+                                           onclick="document.getElementById('move-input').value='fold'",
+                                           cls="action-btn btn-fold"),
+                                    Button("CALL",  type="submit",
+                                           onclick="document.getElementById('move-input').value='call'",
+                                           cls="action-btn btn-call"),
+                                    Button("RAISE", type="submit",
+                                           onclick="document.getElementById('move-input').value='raise'",
+                                           cls="action-btn btn-raise"),
+                                    cls="action-bar"
+                                ),
+                                ws_send=True  # без preventDefault — теперь работает
                             ),
-                            style="width: 100%; text-align: center;"
+                            cls="my-hand-area"
                         ),
                         cls="table-felt"
                     ),
-                    hx_ext="ws", ws_connect=f"/ws/hub/{room}" 
+                    hx_ext="ws", ws_connect=f"/ws/hub/{room}"
                 ),
                 cls="table-wood-rim"
             ),
-            
-            Button(" Open Terminal", onclick="toggleChat()", cls="chat-btn"),
             Div(
-                Div("Table Terminal", Span("✕", onclick="toggleChat()", style="cursor: pointer; color: #888;"), cls="chat-header"),
-                Div(Div(Div("SysAdmin:", style="color: #888; font-size: 11px;"), "Welcome to the cluster.", cls="msg-bot"), id="chat-messages"),
+                Div("DEALER LOG", cls="dealer-log-title"),
+                *[Div(e, cls="dealer-log-entry") for e in log_entries],
+                id="dealer-log", cls="dealer-log"
+            ),
+            Button("💬 Chat", onclick="toggleChat()", cls="chat-btn"),
+            Div(
+                Div("ROOM CHAT", cls="chat-header"),
+                Div(id="chat-messages"),
                 id="chat-panel"
-            )
+            ),
+            cls="page-wrap"
         )
     )
+
+
 @app.ws('/ws/hub/{hub_id}')
 async def ws_action(msg: str, send, hub_id: str):
     if hub_id not in hub_connections:
         hub_connections[hub_id] = []
     if send not in hub_connections[hub_id]:
         hub_connections[hub_id].append(send)
+
     try:
         data = json.loads(msg)
         move = data.get('move')
-        player_name = data.get('player', 'Anonymus')
+        player_name = data.get('player', 'Anonymous')
+
         if not move:
-            return  
-        pot_key = f'room:{hub_id}:pot'
+            return
+
+        pot_key   = f'room:{hub_id}:pot'
+        state_key = f'room:{hub_id}:state'
+
         pot = int(r.get(pot_key) or "0")
-        bot_response = ""
+
+        raw_state = r.get(state_key)
+        if not raw_state:
+            return
+        game_state = json.loads(raw_state)
+
+        bot_phrases  = []
         update_board = ""
+
         if move == 'fold':
-            bot_response = "Toxic Senior: Folding already? Your uptime is worse than AWS us-east-1. 📉"
+            game_state.setdefault('dealer_log', []).append(f"🃏 Dealer: {player_name} folds.")
+            player_phrase = f"{player_name} folded."
+
         elif move == 'call':
             pot = r.incrby(pot_key, 50)
-            
-            bot_response = "Bot OOM-Killer: Just a call? I can read your bluff like a plain-text .env file. 🤡"
-            game_state = json.loads(r.get('game_state_v2'))
-            updated_state = engine.deal_next_phase(game_state)
-            r.set('game_state_v2', json.dumps(updated_state))
-            board_html = [PokerCard(c['rank'], c['suit'], c['color']) for c in updated_state['board']]
-            update_board = Div(*board_html, id="board-cards", hx_swap_oob="innerHTML")       
+            game_state.setdefault('dealer_log', []).append(f"🃏 Dealer: {player_name} calls $50.")
+            player_phrase = f"{player_name} called $50."
+
+            game_state   = engine.deal_next_phase(game_state)
+            r.set(state_key, json.dumps(game_state))
+
+            board_html   = [PokerCard(c['rank'], c['suit'], c['color']) for c in game_state['board']]
+            update_board = Div(*board_html, id="board-cards", cls="board-area", hx_swap_oob="true")
+
         elif move == 'raise':
             pot = r.incrby(pot_key, 100)
-            bot_response = "Toxic Senior: Oh, scaling up? Bro is deploying to production on a Friday... I respect the reckless raise. 🚀"
-        update_pot = Div(f"POT: ${pot}", id="pot-display", hx_swap_oob="true", style="font-size: 28px; font-weight: bold; color: #d4af37; background: rgba(0,0,0,0.5); padding: 5px 20px; border-radius: 20px; display: inline-block; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);")
-        chat_update = Div(
-            Div(Div(f"{player_name}:", style="color: #5bc0de; font-size: 11px;"), f"Executed: {move.upper()}", cls="msg-player"),
-            Div(Div("System:", style="color: #d9534f; font-size: 11px;"), bot_response, cls="msg-bot"),
-            id="chat-messages", hx_swap_oob="beforeend"
+            game_state.setdefault('dealer_log', []).append(f"🃏 Dealer: {player_name} raises to $100.")
+            player_phrase = f"{player_name} raised $100."
+
+        else:
+            return
+
+        bot_folded = game_state.get('bot_folded', {'Toxic Senior': False, 'OOM-Killer': False})
+        for bot_name in ['Toxic Senior', 'OOM-Killer']:
+            if bot_folded.get(bot_name):
+                continue
+            bot_cards   = game_state.get('hands', {}).get(bot_name, [])
+            board_cards = game_state.get('board', [])
+            bot_result  = engine.bot_decide_move(bot_name, bot_cards, board_cards, pot, 50)
+
+            if bot_result['move'] == 'fold':
+                bot_folded[bot_name] = True
+                game_state['dealer_log'].append(f"🃏 Dealer: {bot_name} folds.")
+            elif bot_result['move'] == 'raise':
+                pot = r.incrby(pot_key, 100)
+                game_state['dealer_log'].append(f"🃏 Dealer: {bot_name} raises to $100.")
+            else:
+                pot = r.incrby(pot_key, 50)
+                game_state['dealer_log'].append(f"🃏 Dealer: {bot_name} calls.")
+
+            bot_phrases.append((bot_name, bot_result['phrase']))
+
+        game_state['bot_folded'] = bot_folded
+        game_state['dealer_log'] = game_state['dealer_log'][-10:]
+        r.set(state_key, json.dumps(game_state))
+
+        update_pot = Div(
+            f"POT: ${r.get(pot_key)}",
+            id="pot-display", cls="pot-display", hx_swap_oob="true"
         )
-        html_to_send = f"{update_pot}{chat_update}{update_board}"
-        await broadcast_to_hub(hub_id, html_to_send)
-        
-    finally:
-        pass
-if __name__ == '__main__': serve()
+        update_phase = Div(
+            game_state.get('phase', 'preflop').upper(),
+            cls="phase-badge", id="phase-badge", hx_swap_oob="true"
+        )
+        log_entries = game_state.get('dealer_log', [])
+        update_dealer_log = Div(
+            Div("DEALER LOG", cls="dealer-log-title"),
+            *[Div(e, cls="dealer-log-entry") for e in log_entries],
+            id="dealer-log", cls="dealer-log", hx_swap_oob="true"
+        )
+
+        chat_children = [
+            Div(
+                Div(f"{player_name}:", style="color:#d4af37;font-size:11px;font-family:Cinzel,serif;letter-spacing:1px;"),
+                player_phrase,
+                cls="msg-player"
+            )
+        ]
+        for bot_name, phrase in bot_phrases:
+            chat_children.append(Div(
+                Div(f"{bot_name}:", style="color:#ef9a9a;font-size:11px;"),
+                phrase,
+                cls="msg-bot"
+            ))
+
+        chat_update = Div(*chat_children, id="chat-messages", hx_swap_oob="beforeend")
+
+        parts = [to_xml(update_pot), to_xml(update_phase), to_xml(update_dealer_log), to_xml(chat_update)]
+        if update_board:
+            parts.append(to_xml(update_board))
+
+        await broadcast_to_hub(hub_id, "".join(parts))
+
+    except Exception as e:
+        print(f"[WS ERROR] {e}")
+
+
+if __name__ == '__main__':
+    serve()
