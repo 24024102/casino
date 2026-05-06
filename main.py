@@ -339,13 +339,14 @@ def get(session):
 
     nickname = session['nickname']
     room = session.get('room_id', 'Vegas')
-    pot_key   = f'room:{room}:pot'
+    pot_key = f'room:{room}:pot'
     state_key = f'room:{room}:state'
     if not r.exists(state_key):
         init_state = engine.deal_preflop([nickname])
         r.set(state_key, json.dumps(init_state))
         r.set(pot_key, 0)
     state = json.loads(r.get(state_key))
+    pot = r.get(pot_key) or "0"
     if nickname not in state.get('hands', {}):
         state['hands'][nickname] = []
         r.set(state_key, json.dumps(state))
@@ -372,6 +373,18 @@ def get(session):
     board_cards   = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('board', [])]
     my_hole_cards = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('hands', {}).get(nickname, [])]
     log_entries   = state.get('dealer_log', ['🃏 Dealer: Welcome to the table.'])
+    if phase == 'showdown':
+        action_buttons = Div(
+            Button("NEW ROUND 🔄", type="submit", onclick="document.getElementById('move-input').value='restart'", cls="action-btn btn-raise"),
+            cls="action-bar"
+        )
+    else:
+        action_buttons = Div(
+            Button("FOLD",  type="submit", onclick="document.getElementById('move-input').value='fold'", cls="action-btn btn-fold"),
+            Button("CALL",  type="submit", onclick="document.getElementById('move-input').value='call'", cls="action-btn btn-call"),
+            Button("RAISE", type="submit", onclick="document.getElementById('move-input').value='raise'", cls="action-btn btn-raise"),
+            cls="action-bar"
+        )
     top_nav = Div(
         Div("♠ CASINO NETWORK", cls="nav-brand"),
         Div(
@@ -383,7 +396,23 @@ def get(session):
         Div("Playing as: ", Span(nickname), cls="nav-profile"),
         cls="top-nav"
     )
-
+    player_slots = []
+    for p in state.get('hands', {}).keys():
+        is_me = "active" if p == nickname else ""
+        title = "YOU" if p == nickname else "PLAYER"
+        if p in ('Toxic Senior', 'OOM-Killer'): title = "BOT"
+        player_slots.append(
+            Div(
+                Div(f"👤 {p}", style="font-size: 12px; color: #aaa;"), 
+                Div("$1000", style="font-weight: bold; color: #fff;"), 
+                Div(title, style="font-size:10px; color:#666;"), 
+                cls=f"player-seat {is_me}"
+            )
+            Div(
+        Div("D", cls="dealer-chip"),
+        Div(*player_slots, style="display: flex; gap: 15px; justify-content: center; width: 100%; margin-bottom: 40px; position: relative; flex-wrap: wrap;"),
+        )
+        )
     return Html(
         Head(
             Title(f"{room} — High Stakes"),
@@ -407,19 +436,16 @@ def get(session):
                             Form(
                                 Input(type="hidden", name="player", value=nickname),
                                 Input(type="hidden", name="move", id="move-input", value=""),
-                                Div(
-                                    Button("FOLD",  type="submit",
-                                           onclick="document.getElementById('move-input').value='fold'",
-                                           cls="action-btn btn-fold"),
-                                    Button("CALL",  type="submit",
-                                           onclick="document.getElementById('move-input').value='call'",
-                                           cls="action-btn btn-call"),
-                                    Button("RAISE", type="submit",
-                                           onclick="document.getElementById('move-input').value='raise'",
-                                           cls="action-btn btn-raise"),
+                               Div(
+                                    Button("NEW ROUND 🔄", type="submit", onclick="document.getElementById('move-input').value='restart'", cls="action-btn btn-raise"),
+                                    cls="action-bar"
+                                ) if phase == 'showdown' else Div(
+                                    Button("FOLD",  type="submit", onclick="document.getElementById('move-input').value='fold'", cls="action-btn btn-fold"),
+                                    Button("CALL",  type="submit", onclick="document.getElementById('move-input').value='call'", cls="action-btn btn-call"),
+                                    Button("RAISE", type="submit", onclick="document.getElementById('move-input').value='raise'", cls="action-btn btn-raise"),
                                     cls="action-bar"
                                 ),
-                                ws_send=True  # без preventDefault — теперь работает
+                                ws_send=True
                             ),
                             cls="my-hand-area"
                         ),
@@ -440,9 +466,15 @@ def get(session):
                 Div(id="chat-messages"),
                 id="chat-panel"
             ),
-            cls="page-wrap"
+            cls="page-wrap",
+            hx_ext="ws", ws_connect=f"/ws/hub/{room}"
         )
     )
+        
+    
+        
+    
+        
 
 
 @app.ws('/ws/hub/{hub_id}')
@@ -469,6 +501,13 @@ async def ws_action(msg: str, send, hub_id: str):
         if not raw_state:
             return
         game_state = json.loads(raw_state)
+        if move == 'restart':
+            humans = [p for p in game_state.get('hands', {}).keys() if p not in ['Toxic Senior', 'OOM-Killer']]
+            new_state = engine.deal_preflop(humans)
+            r.set(state_key, json.dumps(new_state))
+            r.set(pot_key, 0)
+            await broadcast_to_hub(hub_id, '<script>window.location.reload();</script>')
+            return
 
         bot_phrases  = []
         update_board = ""

@@ -117,16 +117,17 @@ def preflop_strength(hole_cards):
     return min(score, 1.0)
 
 def bot_decide_move(bot_name, bot_cards, board_cards, current_pot, current_bet):
+    if not bot_cards:
+        return {"move": "fold", "phrase": f"{bot_name}: I have no cards. Folding."}
+
     if board_cards:
         strength = evaluate_hand_strength(bot_cards, board_cards) / 8.0
     else:
         strength = preflop_strength(bot_cards)
 
-    
     rand = random.random()
 
     if bot_name == "Toxic Senior":
-        
         if strength < 0.25 and rand < 0.6:
             move = "fold"
             phrase = random.choice(TOXIC_FOLD_RESPONSE)
@@ -137,7 +138,6 @@ def bot_decide_move(bot_name, bot_cards, board_cards, current_pot, current_bet):
             move = "call"
             phrase = random.choice(TOXIC_CALL)
     else:
-      
         if current_pot > 500 or strength > 0.75:
             move = "raise"
             phrase = random.choice(OOM_ALLIN)
