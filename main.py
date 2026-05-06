@@ -401,6 +401,7 @@ def get(session):
         is_me = "active" if p == nickname else ""
         title = "YOU" if p == nickname else "PLAYER"
         if p in ('Toxic Senior', 'OOM-Killer'): title = "BOT"
+        
         player_slots.append(
             Div(
                 Div(f"👤 {p}", style="font-size: 12px; color: #aaa;"), 
@@ -408,11 +409,7 @@ def get(session):
                 Div(title, style="font-size:10px; color:#666;"), 
                 cls=f"player-seat {is_me}"
             )
-            Div(
-        Div("D", cls="dealer-chip"),
-        Div(*player_slots, style="display: flex; gap: 15px; justify-content: center; width: 100%; margin-bottom: 40px; position: relative; flex-wrap: wrap;"),
-        )
-        )
+        ) 
     return Html(
         Head(
             Title(f"{room} — High Stakes"),
