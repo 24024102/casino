@@ -283,7 +283,8 @@ RAISE_AMOUNT = 100
 BOT_THINK_SECONDS = 0.8
 def ActionButtons(player_name, state, oob=False):
     attrs = {"cls": "action-bar", "id": "action-buttons-wrap"}
-    if oob: attrs["hx_swap_oob"] = "true"
+    if oob:
+        attrs["hx_swap_oob"] = "true"
 
     if state.get('phase') == 'showdown':
         return Div(
@@ -291,6 +292,9 @@ def ActionButtons(player_name, state, oob=False):
                    ws_send=True, hx_vals=json.dumps({"move": "restart"})),
             **attrs
         )
+
+    if player_name not in state.get('hands', {}):
+        return Div(Div("WAITING NEXT ROUND", cls="turn-note"), **attrs)
 
     if state.get('current_turn') != player_name:
         return Div(
@@ -359,6 +363,86 @@ def new_game_state(humans):
     state['pot_paid'] = False
     state['current_turn'] = first_player_needing_action(state)
     return state
+
+def render_player_slots(state, viewer=None):
+    slots = []
+    for p in state.get('hands', {}):
+        folded = state.get('folded', {}).get(p, False)
+        if folded:
+            status = "FOLDED"
+        elif p == state.get('current_turn'):
+            status = "TURN"
+        elif p == viewer:
+            status = "YOU"
+        elif p in BOT_NAMES:
+            status = "BOT"
+        else:
+            status = "WAITING"
+        slots.append(Div(
+            Div(("🤖 " if p in BOT_NAMES else "👤 ") + p, cls="player-name"),
+            Div(f"${state.get('chips', {}).get(p, 1000):,}", cls="player-chips"),
+            Div(status, cls="player-status"),
+            cls=f"player-seat {'bot-seat' if p in BOT_NAMES else ''} {'active' if p == state.get('current_turn') else ''}"
+        ))
+    return slots
+def advance_turn_after_action(state, after_player):
+    if len(active_players(state)) <= 1:
+        state['phase'] = 'showdown'
+        state['current_turn'] = None
+        state['dealer_log'].append(f"Dealer:{active_players(state)[0]}wins")
+        return
+    nxt = first_player_needing_action(state, after=after_player)
+    if nxt:
+        state['current_turn'] = nxt
+        return
+    if state.get('phase') == 'river':
+        state['phase'] = 'showdown'
+        state['current_turn'] = None
+        state['dealer_log'].append("Dealer:SHOWDOWN")
+    else:
+        engine.deal_next_phase(state)
+        reset_betting_round(state)
+def apply_move_to_state(state, player_name, move, phrase=None):
+    state.setdefault('dealer_log', [])
+    if move == 'fold':
+        state['folded'][player_name] = True
+        state['acted'][player_name] = True
+        state['dealer_log'].append(f"🃏 {player_name} folds.")
+    elif move == 'call':
+        needed = max(0, state['current_bet'] - state['street_bets'].get(player_name, 0))
+        state['pot'] += needed
+        state['street_bets'][player_name] += needed
+        state['acted'][player_name] = True
+        state['dealer_log'].append(f"🃏 {player_name} {'checks' if needed == 0 else f'calls ${needed}'}.")
+    elif move == 'raise':
+        state['current_bet'] += RAISE_AMOUNT
+        needed = state['current_bet'] - state['street_bets'].get(player_name, 0)
+        state['pot'] += needed
+        state['street_bets'][player_name] += needed
+        state['acted'][player_name] = True
+        state['dealer_log'].append(f"🃏 {player_name} raises ${RAISE_AMOUNT}.")
+    if phrase:
+        state['dealer_log'].append(f"💬 {phrase}")
+    advance_turn_after_action(state, player_name)
+async def run_bot_turns(state):
+    while state.get('phase') != 'showdown' and state.get('current_turn') in BOT_NAMES:
+        bot_name = state['current_turn']
+        await asyncio.sleep(BOT_THINK_SECONDS)
+        needed = max(0, state['current_bet'] - state['street_bets'].get(bot_name, 0))
+        result = engine.bot_decide_move(
+            bot_name,
+            state.get('hands', {}).get(bot_name, []),
+            state.get('board', []),
+            state.get('pot', 0),
+            needed
+        )
+        move = result.get('move', 'call')
+        if needed == 0 and move == 'fold':
+            move = 'call'
+
+        if move not in ('fold', 'call', 'raise'):
+            move = 'call'
+        apply_move_to_state(state, bot_name, move, result.get('phrase'))
 @rt('/login')
 def post(session, nickname: str, room_choice: str): 
     session['nickname'] = nickname
@@ -431,8 +515,7 @@ def get(session):
 
     nickname = session['nickname']
     room = session.get('room_id', 'Vegas')
-    pot_key = f'room:{room}:pot'
-    state_key = f'room:{room}:state'
+    
     raw = r.get(room_state_key(room))
     if raw:
         state = json.loads(raw)
@@ -446,25 +529,7 @@ def get(session):
     save_state(room, state)
     pot = state.get('pot', 0)
     phase = state.get('phase', 'preflop')
-    phase = state.get('phase', 'preflop')
-    player_slots = []
-    for p, cards in state.get('hands', {}).items():
-        if p in ('Toxic Senior', 'OOM-Killer'):
-            folded = state.get('bot_folded', {}).get(p, False)
-            player_slots.append(Div(
-                Div(f"🤖 {p}", cls="player-name"),
-                Div("$1,000", cls="player-chips"),
-                Div("FOLDED" if folded else "IN HAND", cls="player-status"),
-                cls="player-seat bot-seat"
-            ))
-        else:
-            player_slots.append(Div(
-                Div(f"👤 {p}", cls="player-name"),
-                Div("$1,000", cls="player-chips"),
-                Div("YOU" if p == nickname else "PLAYER", cls="player-status"),
-                cls=f"player-seat {'active' if p == nickname else ''}"
-            ))
-
+    player_slots = render_player_slots(state, nickname)
     board_cards   = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('board', [])]
     my_hole_cards = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('hands', {}).get(nickname, [])]
     log_entries   = state.get('dealer_log', ['🃏 Dealer: Welcome to the table.'])
@@ -506,7 +571,8 @@ def get(session):
                     cls="table-felt"
                 ),
                 **{"hx-ext": "ws"},
-                ws_connect=f"/ws/hub/{room}",
+                ws_connect=f"/ws/hub/{room}/{quote(nickname, safe='')}",
+
                 cls="table-wood-rim"
             ),
             
@@ -541,25 +607,14 @@ async def ws_action(data: dict, send, hub_id: str, player_name: str):
         return ActionButtons(player_name, state, oob=True)
     if player_name != state.get('current_turn'):
         return ActionButtons(player_name, state, oob=True)
-    if move == 'fold':
-        state['folded'][player_name] = True
-        state['acted'][player_name] = True
-        state['dealer_log'].append(f"🃏 {player_name} folds.")
-    elif move == 'call':
-        needed = max(0, state['current_bet'] - state['street_bets'].get(player_name, 0))
-        state['pot'] += needed
-        state['street_bets'][player_name] += needed
-        state['acted'][player_name] = True
-        state['dealer_log'].append(f"🃏 {player_name} {'checks' if needed == 0 else f'calls ${needed}'}.")
-    elif move == 'raise':
-        state['current_bet'] += RAISE_AMOUNT
-        needed = state['current_bet'] - state['street_bets'].get(player_name, 0)
-        state['pot'] += needed
-        state['street_bets'][player_name] += needed
-        state['acted'][player_name] = True
-        state['dealer_log'].append(f"🃏 {player_name} raises ${RAISE_AMOUNT}.")
-    else:
+    if move not in ('fold', 'call', 'raise'):
         return
+    if player_name != state.get('current_turn'):
+     return ActionButtons(player_name, state, oob=True)
+    state['dealer_log'] = state['dealer_log'][-10:]
+    save_state(hub_id, state)
+    apply_move_to_state(state, player_name, move)
+    await run_bot_turns(state)
     if len(active_players(state)) <= 1:
         state['phase'] = 'showdown'
         state['current_turn'] = None
@@ -582,6 +637,7 @@ async def ws_action(data: dict, send, hub_id: str, player_name: str):
 
     return (
         Div(state.get('phase', 'preflop').upper(), cls="phase-badge", id="phase-badge", hx_swap_oob="true"),
+        Div(*render_player_slots(state, player_name), id="players-row", cls="players-row", hx_swap_oob="true"),
         Div(f"POT: ${state.get('pot', 0)}", id="pot-display", cls="pot-display", hx_swap_oob="true"),
         Div(*board_cards, id="board-cards", cls="board-area", hx_swap_oob="true"),
         Div(Div("DEALER LOG", cls="dealer-log-title"),
