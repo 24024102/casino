@@ -386,22 +386,40 @@ def get(session):
     log_entries   = state.get('dealer_log', ['🃏 Dealer: Welcome to the table.'])
     if phase == 'showdown':
         action_buttons = Div(
-            Form(
-                Input(type="hidden", name="player", value=nickname), Input(type="hidden", name="move", value="restart"),
-                Button("NEW ROUND 🔄", type="submit", cls="action-btn btn-new-round"),
-                ws_send=True, cls="action-form"
+            Button(
+                "NEW ROUND 🔄",
+                type="button",
+                cls="action-btn btn-new-round",
+                ws_send=True,
+                hx_vals=json.dumps({"player": nickname, "move": "restart"})
             ),
-            cls="action-bar", id="action-buttons-wrap"
+            cls="action-bar",
+            id="action-buttons-wrap"
         )
     else:
         action_buttons = Div(
-            Form(Input(type="hidden", name="player", value=nickname), Input(type="hidden", name="move", value="fold"), 
-                 Button("FOLD", type="submit", cls="action-btn btn-fold"), ws_send=True, cls="action-form"),
-            Form(Input(type="hidden", name="player", value=nickname), Input(type="hidden", name="move", value="call"), 
-                 Button("CALL", type="submit", cls="action-btn btn-call"), ws_send=True, cls="action-form"),
-            Form(Input(type="hidden", name="player", value=nickname), Input(type="hidden", name="move", value="raise"), 
-                 Button("RAISE", type="submit", cls="action-btn btn-raise"), ws_send=True, cls="action-form"),
-            cls="action-bar", id="action-buttons-wrap"
+            Button(
+                "FOLD",
+                type="button",
+                cls="action-btn btn-fold",
+                ws_send=True,
+                hx_vals=json.dumps({"player": nickname, "move": "fold"})
+            ),
+            Button(
+                "CALL",
+                type="button",
+                cls="action-btn btn-call",
+                ws_send=True,
+                hx_vals=json.dumps({"player": nickname, "move": "call"})
+            ),
+            Button(
+                "RAISE",
+                type="button",
+                cls="action-btn btn-raise",
+                ws_send=True,
+                hx_vals=json.dumps({"player": nickname, "move": "raise"})
+            )
+        
         )
     top_nav = Div(
         Div("♠ CASINO NETWORK FIX-TEST", cls="nav-brand"),
@@ -491,7 +509,6 @@ async def ws_action(data: dict, send, hub_id: str):
             return
         bot_phrases  = []
         update_board = ""
-        update_board = ""
         advance_phase = False
 
         if move == 'fold':
@@ -563,17 +580,20 @@ async def ws_action(data: dict, send, hub_id: str):
         ]
 
         if current_phase == 'showdown':
-            new_buttons = Div(
-                Form(
-                    Input(type="hidden", name="move", value="restart"),
-                    Button("NEW ROUND 🔄", type="submit", cls="action-btn"),
-                    ws_send=True,
-                ),
-                cls="action-bar",
-                id="action-buttons-wrap",
-                hx_swap_oob="true"
-            )
-            parts.append(to_xml(new_buttons))
+           new_buttons = Div(
+        Button(
+        "NEW ROUND 🔄",
+        type="button",
+        cls="action-btn",
+        ws_send=True,
+        hx_vals=json.dumps({"player": player_name, "move": "restart"})
+        ),
+        cls="action-bar",
+        id="action-buttons-wrap",
+        hx_swap_oob="true"
+)
+
+        parts.append(to_xml(new_buttons))
 
         if update_board:
             parts.append(to_xml(update_board))
