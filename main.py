@@ -30,6 +30,54 @@ async def broadcast_to_hub(hub_id, message):
         for d in dead:
            hub_connections[hub_id].remove(d)
            send_to_player.pop(d, None)  
+PLAYER_TIMEOUT_SECONDS = 15
+
+def player_presence_key(room,player):
+    return f"room{room}:presence:{player}"
+def mark_player_seen(room, player):
+    if player:
+        r.setex(player_presence_key(room, player), PLAYER_TIMEOUT_SECONDS, "1")
+def player_is_online(room, player):
+    if player in BOT_NAMES:
+        return True
+    return bool(r.exists(player_presence_key(room,player)))
+def settle_turn_if_needed(state):
+    if state.get('phase') == 'showdown':
+        return
+    if len(active_players(state)) <= 1:
+        finish_hand(state)
+        return
+    if state.get('current_turn') not in active_players(state):
+        nxt = first_player_needing_action(state, after=state.get('current_turn'))
+        if nxt:
+            state['current_turn'] = nxt
+        elif state.get('phase') == 'river':
+            finish_hand(state)
+        else:
+            engine.deal_next_phase(state)
+            reset_betting_round(state)
+def cleanup_absent_players(room, state):
+    if state.get('phase') == 'showdown':
+        return False
+    changed = False
+    old_waiting = state.get('waiting_players', [])
+    new_waiting = [p for p in old_waiting if player_is_online(room, p)]
+    if new_waiting != old_waiting:
+        state['waiting_players'] = new_waiting
+        changed = True
+    for p in list(state.get('hands', {})):
+        if p in BOT_NAMES:
+            continue
+        if player_is_online(room, p):
+            continue
+        if not state.get('folded', {}).get(p, False):
+            state.setdefault('folded', {})[p] = True
+            state.setdefault('acted', {})[p] = True
+            state.setdefault('dealer_log', []).append(f" {p} timed out and folds.")
+            changed = True
+    if changed:
+        settle_turn_if_needed(state)
+    return changed
 
 
 chat_script = Script("""
@@ -408,7 +456,6 @@ def new_game_state(humans, previous_dealer=None):
     state['dealer_button'] = dealer
     state['waiting_players'] = []
     state['winners'] = []
-    state['winners'] = []
     state['winning_hand'] = None
     state['pot_paid'] = False
 
@@ -543,13 +590,13 @@ def run_bot_turns_now(state):
         bot_take_turn(state)
 async def run_bot_turns(state, send=None, player_name=None, hub_id=None):
    while state.get('phase') != 'showdown' and state.get('current_turn') in BOT_NAMES:
-    bot_name = state.get('current_turn')
-    state['thinking_bot'] = bot_name
-    if send and player_name:
+      bot_name = state.get('current_turn')
+      state['thinking_bot'] = bot_name
+      if send and player_name:
         await send("".join(to_xml(x) for x in table_update(state, player_name)))
-    await asyncio.sleep(BOT_THINK_SECONDS)
-    state.pop('thinking_bot', None)
-    bot_take_turn(state)
+      await asyncio.sleep(BOT_THINK_SECONDS)
+      state.pop('thinking_bot', None)
+      bot_take_turn(state)
 
 @rt('/login')
 def post(session, nickname: str, room_choice: str): 
@@ -623,7 +670,7 @@ def get(session):
 
     nickname = session['nickname']
     room = session.get('room_id', 'Vegas')
-    
+    mark_player_seen(room, nickname)
     raw = r.get(room_state_key(room))
     if raw:
         state = json.loads(raw)
@@ -634,6 +681,9 @@ def get(session):
     if nickname not in state.get('hands', {}) and nickname not in state.get('waiting_players', []):
         state.setdefault('waiting_players', []).append(nickname)
         state.setdefault('dealer_log', []).append(f" Dealer: {nickname} joined next round.")
+    cleanup_absent_players(room,state)
+    if state.get('current_turn') in BOT_NAMES:
+        run_bot_turns_now(state)
     save_state(room, state)
     pot = state.get('pot', 0)
     phase = state.get('phase', 'preflop')
@@ -643,17 +693,20 @@ def get(session):
     log_entries   = state.get('dealer_log', ['🃏 Dealer: Welcome to the table.'])
     action_buttons = ActionButtons(nickname, state)
     top_nav = Div(
-        Div("♠ CASINO NETWORK FIX-TEST", cls="nav-brand"),
+    Div("♠ CASINO NETWORK FIX-TEST", cls="nav-brand"),
 
-        Div(
-            A("Las Vegas", href="/switch/Vegas", cls="active" if room == "Vegas" else ""),
-            A("Monaco",   href="/switch/Monaco", cls="active" if room == "Monaco" else ""),
-            A("Macau",    href="/switch/Macau",  cls="active" if room == "Macau"  else ""),
-            cls="hub-links"
-        ),
-        Div("Playing as: ", Span(nickname), cls="nav-profile"),
-        cls="top-nav"
-    )
+    Div(
+        A("Las Vegas", href="/switch/Vegas", cls="active" if room == "Vegas" else ""),
+        A("Monaco",   href="/switch/Monaco", cls="active" if room == "Monaco" else ""),
+        A("Macau",    href="/switch/Macau",  cls="active" if room == "Macau"  else ""),
+        cls="hub-links"
+    ),
+
+    Div("Playing as: ", Span(nickname), cls="nav-profile"),
+
+    cls="top-nav"
+)
+    
     
     return Html(
         Head(
@@ -664,8 +717,15 @@ def get(session):
             casino_style
         ),
     Body(
-            top_nav,
-            Div(
+            
+             top_nav,
+        Div(
+            id="table-sync-poller",
+            hx_get=f"/sync/{room}/{quote(nickname, safe='')}",
+            hx_trigger="load, every 2s",
+            hx_swap="none"
+        ),
+        Div(
                Div(
                     Div(phase.upper(), cls="phase-badge", id="phase-badge"),
                     Div(*player_slots, id="players-row", cls="players-row"),
@@ -710,15 +770,33 @@ def table_update(state, player_name):
             id="dealer-log", cls="dealer-log", hx_swap_oob="true"),
         ActionButtons(player_name, state, oob=True),
     )
+@rt('/sync/{room}/{player_name}')
+def get(room: str, player_name: str):
+    player_name = unquote(player_name)
+    mark_player_seen(room, player_name)
+
+    raw = r.get(room_state_key(room))
+    if not raw:
+        return ""
+    state = json.loads(raw)
+    cleanup_absent_players(room, state)
+    if state.get('current_turn') in BOT_NAMES:
+        run_bot_turns_now(state)
+    state['dealer_log'] = state.get('dealer_log', [])[-10:]
+    save_state(room, state)
+    return table_update(state, player_name)
 
 @app.ws('/ws/hub/{hub_id}/{player_name}')
 async def ws_action(data: dict, send, hub_id: str, player_name: str):
     
     player_name = unquote(player_name)
+    
     move = data.get('move', '')
     raw = r.get(room_state_key(hub_id))
     if not raw: return
     state = json.loads(raw)
+    mark_player_seen(hub_id, player_name)
+    cleanup_absent_players(hub_id, state)
     if move == 'restart':
         humans = [p for p in state.get('hands', {}) if p not in BOT_NAMES]
         humans += state.get('waiting_players', [])
@@ -726,11 +804,12 @@ async def ws_action(data: dict, send, hub_id: str, player_name: str):
         await run_bot_turns(state, send, player_name, hub_id)
         save_state(hub_id, state)
         return table_update(state, player_name)
-
     if state.get('phase') == 'showdown':
-        return ActionButtons(player_name, state, oob=True)
+      save_state(hub_id, state)
+      return table_update(state, player_name)
     if player_name != state.get('current_turn'):
-        return ActionButtons(player_name, state, oob=True)
+      save_state(hub_id, state)
+      return table_update(state, player_name)
     if move not in ('fold', 'call', 'raise'):
         return
     if player_name != state.get('current_turn'):
