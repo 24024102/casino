@@ -496,6 +496,7 @@ async def ws_action(msg: str, send, hub_id: str):
     data = parse_ws_form(msg)
     move = ws_value(data, 'move')
     player_name = ws_value(data, 'player', 'Anonymous')
+    print(f"[WS PARSED] move={move} player={player_name} data={data}", flush=True)
 
     if not msg or msg.strip() == '':
         nickname = send_to_player.pop(send, None)
@@ -534,41 +535,59 @@ async def ws_action(msg: str, send, hub_id: str):
             return
         bot_phrases  = []
         update_board = ""
+        update_board = ""
+        advance_phase = False
+
         if move == 'fold':
             game_state.setdefault('dealer_log', []).append(f"🃏 {player_name} folds.")
-            player_phrase = f"{player_name} folded."
+            game_state.setdefault('human_folded', {})[player_name] = True
+            game_state['phase'] = 'showdown'
+            game_state['dealer_log'].append("🃏 Dealer: Player folded. Round is over.")
+
         elif move == 'call':
             pot = r.incrby(pot_key, 50)
             game_state.setdefault('dealer_log', []).append(f"🃏 {player_name} calls $50.")
-            player_phrase = f"{player_name} called $50."
-            game_state    = engine.deal_next_phase(game_state)
-            r.set(state_key, json.dumps(game_state))
-            board_html    = [PokerCard(c['rank'], c['suit'], c['color']) for c in game_state['board']]
-            update_board  = Div(*board_html, id="board-cards", cls="board-area", hx_swap_oob="true")
+            advance_phase = True
+
         elif move == 'raise':
             pot = r.incrby(pot_key, 100)
             game_state.setdefault('dealer_log', []).append(f"🃏 {player_name} raises $100.")
-            player_phrase = f"{player_name} raised $100."
+            advance_phase = True
+
         else:
             return
-        bot_folded = game_state.get('bot_folded', {b: False for b in BOT_NAMES})
-        for bot_name in BOT_NAMES:
-            if bot_folded.get(bot_name):
-                continue
-            bot_cards   = game_state.get('hands', {}).get(bot_name, [])
-            board_cards = game_state.get('board', [])
-            result      = engine.bot_decide_move(bot_name, bot_cards, board_cards, pot, 50)
 
-            if result['move'] == 'fold':
-                bot_folded[bot_name] = True
-                game_state['dealer_log'].append(f"🃏 {bot_name} folds.")
-            elif result['move'] == 'raise':
-                pot = r.incrby(pot_key, 100)
-                game_state['dealer_log'].append(f"🃏 {bot_name} raises $100.")
-            else:
-                pot = r.incrby(pot_key, 50)
-                game_state['dealer_log'].append(f"🃏 {bot_name} calls.")
-            bot_phrases.append((bot_name, result['phrase']))
+        bot_folded = game_state.get('bot_folded', {b: False for b in BOT_NAMES})
+
+        if game_state.get('phase') != 'showdown':
+            for bot_name in BOT_NAMES:
+                if bot_folded.get(bot_name):
+                    continue
+
+                bot_cards = game_state.get('hands', {}).get(bot_name, [])
+                board_cards = game_state.get('board', [])
+                result = engine.bot_decide_move(bot_name, bot_cards, board_cards, pot, 50)
+
+                if result['move'] == 'fold':
+                    bot_folded[bot_name] = True
+                    game_state['dealer_log'].append(f"🃏 {bot_name} folds.")
+                elif result['move'] == 'raise':
+                    pot = r.incrby(pot_key, 100)
+                    game_state['dealer_log'].append(f"🃏 {bot_name} raises $100.")
+                else:
+                    pot = r.incrby(pot_key, 50)
+                    game_state['dealer_log'].append(f"🃏 {bot_name} calls.")
+
+        game_state['bot_folded'] = bot_folded
+
+        if advance_phase and game_state.get('phase') != 'showdown':
+            game_state = engine.deal_next_phase(game_state)
+
+        game_state['dealer_log'] = game_state['dealer_log'][-10:]
+        r.set(state_key, json.dumps(game_state))
+
+        board_html = [PokerCard(c['rank'], c['suit'], c['color']) for c in game_state.get('board', [])]
+        update_board = Div(*board_html, id="board-cards", cls="board-area", hx_swap_oob="true")
 
         game_state['bot_folded'] = bot_folded
         game_state['dealer_log'] = game_state['dealer_log'][-10:]
