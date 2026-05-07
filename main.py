@@ -380,18 +380,18 @@ def get(session):
     board_cards   = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('board', [])]
     my_hole_cards = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('hands', {}).get(nickname, [])]
     log_entries   = state.get('dealer_log', ['🃏 Dealer: Welcome to the table.'])
-    if current_phase == 'showdown':
-            new_buttons = Div(
-                Button("NEW ROUND 🔄", ws_send=True, hx_vals=f'{{"move": "restart", "player": "{player_name}"}}', cls="action-btn btn-new-round"),
-                cls="action-bar", id="action-buttons-wrap", hx_swap_oob="true"
-            )
+    if phase == 'showdown':
+        action_buttons = Div(
+            Button("NEW ROUND 🔄", ws_send=True, hx_vals=json.dumps({"move": "restart", "player": nickname}), cls="action-btn btn-new-round"),
+            cls="action-bar", id="action-buttons-wrap"
+        )
     else:
-        new_buttons = Div(
-            Button("FOLD",  ws_send=True, hx_vals=f'{{"move": "fold", "player": "{player_name}"}}', cls="action-btn btn-fold"),
-            Button("CALL",  ws_send=True, hx_vals=f'{{"move": "call", "player": "{player_name}"}}', cls="action-btn btn-call"),
-             Button("RAISE", ws_send=True, hx_vals=f'{{"move": "raise", "player": "{player_name}"}}', cls="action-btn btn-raise"),
-             cls="action-bar", id="action-buttons-wrap", hx_swap_oob="true"
-            )
+        action_buttons = Div(
+            Button("FOLD",  ws_send=True, hx_vals=json.dumps({"move": "fold", "player": nickname}), cls="action-btn btn-fold"),
+            Button("CALL",  ws_send=True, hx_vals=json.dumps({"move": "call", "player": nickname}), cls="action-btn btn-call"),
+            Button("RAISE", ws_send=True, hx_vals=json.dumps({"move": "raise", "player": nickname}), cls="action-btn btn-raise"),
+            cls="action-bar", id="action-buttons-wrap"
+        )
     top_nav = Div(
         Div("♠ CASINO NETWORK", cls="nav-brand"),
         Div(
