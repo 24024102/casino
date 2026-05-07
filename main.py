@@ -447,8 +447,8 @@ def get(session):
                         cls="my-hand-area"
                     ),
                     cls="table-felt"
-                )
-                 **{"hx-ext": "ws"},
+                ),
+                **{"hx-ext": "ws"},
                 ws_connect=f"/ws/hub/{room}",
                 cls="table-wood-rim"
             ),
@@ -497,10 +497,6 @@ async def ws_action(msg: str, send, hub_id: str):
                 await broadcast_to_hub(hub_id, to_xml(note))
         return
     try:
-        data        = json.loads(msg)
-        move        = data.get('move', '').strip()
-        player_name = data.get('player', 'Anonymous')
-
         if not move:
             return
         send_to_player[send] = player_name
@@ -568,50 +564,61 @@ async def ws_action(msg: str, send, hub_id: str):
             id="dealer-log", cls="dealer-log", hx_swap_oob="true"
         )
         if current_phase == 'showdown':
+
+          new_buttons = Div(
+                Form(
+                    Input(type="hidden", name="player", value=player_name),
+                    Input(type="hidden", name="move", value="restart"),
+                    Button("NEW ROUND 🔄", type="submit", cls="action-btn"),
+                    ws_send=True,
+                ),
+                cls="action-bar",
+                id="action-buttons-wrap",
+                hx_swap_oob="true"
+            )
+
+        else:
+
             new_buttons = Div(
 
-    Form(
-        Input(type="hidden", name="player", value=player_name),
-        Input(type="hidden", name="move", value="fold"),
-        Button("FOLD", type="submit", cls="action-btn btn-fold"),
-        ws_send=True,
-    ),
+                Form(
+                    Input(type="hidden", name="player", value=player_name),
+                    Input(type="hidden", name="move", value="fold"),
+                    Button("FOLD", type="submit", cls="action-btn btn-fold"),
+                    ws_send=True,
+                ),
 
-    Form(
-        Input(type="hidden", name="player", value=player_name),
-        Input(type="hidden", name="move", value="call"),
-        Button("CALL", type="submit", cls="action-btn btn-call"),
-        ws_send=True,
-    ),
+                Form(
+                    Input(type="hidden", name="player", value=player_name),
+                    Input(type="hidden", name="move", value="call"),
+                    Button("CALL", type="submit", cls="action-btn btn-call"),
+                    ws_send=True,
+                ),
 
-    Form(
-        Input(type="hidden", name="player", value=player_name),
-        Input(type="hidden", name="move", value="raise"),
-        Button("RAISE", type="submit", cls="action-btn btn-raise"),
-        ws_send=True,
-    ),
+                Form(
+                    Input(type="hidden", name="player", value=player_name),
+                    Input(type="hidden", name="move", value="raise"),
+                    Button("RAISE", type="submit", cls="action-btn btn-raise"),
+                    ws_send=True,
+                ),
 
-    cls="action-bar",
-    id="action-buttons-wrap",
-    hx_swap_oob="true"
-)
-        chat_items = [Div(
-            Div(f"{player_name}:", style="color:#d4af37;font-size:11px;font-family:Cinzel,serif;"),
-            player_phrase, cls="msg-player"
-        )]
-        for bot_name, phrase in bot_phrases:
-            chat_items.append(Div(
-                Div(f"{bot_name}:", style="color:#ef9a9a;font-size:11px;"),
-                phrase, cls="msg-bot"
-            ))
-        chat_update = Div(*chat_items, id="chat-messages", hx_swap_oob="beforeend")
+                cls="action-bar",
+                id="action-buttons-wrap",
+                hx_swap_oob="true"
+            )
 
         parts = [
             to_xml(update_pot),
             to_xml(update_phase),
             to_xml(update_log),
             to_xml(new_buttons),
-            to_xml(chat_update),
+        ]
+        parts = [
+            to_xml(update_pot),
+            to_xml(update_phase),
+            to_xml(update_log),
+            to_xml(new_buttons),
+            
         ]
         if update_board:
             parts.append(to_xml(update_board))
