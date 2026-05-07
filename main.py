@@ -401,7 +401,8 @@ def get(session):
             cls="action-bar", id="action-buttons-wrap"
         )
     top_nav = Div(
-        Div("♠ CASINO NETWORK", cls="nav-brand"),
+        Div("♠ CASINO NETWORK FIX-TEST", cls="nav-brand"),
+
         Div(
             A("Las Vegas", href="/switch/Vegas", cls="active" if room == "Vegas" else ""),
             A("Monaco",   href="/switch/Monaco", cls="active" if room == "Monaco" else ""),
