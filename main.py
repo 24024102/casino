@@ -7,7 +7,10 @@ from urllib.parse import parse_qs
 
 hub_name = os.getenv('HUB_NAME', 'Unknown Hub')
 r = redis.Redis(host='redis', port=6379, decode_responses=True)
-app, rt = fast_app(secret_key=os.getenv("SESSION_SECRET", "dev-only-fallback"))
+app, rt = fast_app(
+    secret_key=os.getenv("SESSION_SECRET", "dev-only-fallback"),
+    exts='ws'
+)
 
 hub_connections = {}
 
@@ -416,8 +419,7 @@ def get(session):
     return Html(
         Head(
             Title(f"{room} — High Stakes"),
-            Script(src="https://unpkg.com/htmx.org@2.0.2"),
-            Script(src="https://unpkg.com/htmx-ext-ws@2.0.0/ws.js"),
+            
             chat_script,
             casino_style
         ),
@@ -453,71 +455,25 @@ def get(session):
         )
     )
 
-        
-def parse_ws_form(msg):
-    if isinstance(msg, bytes):
-        msg = msg.decode()
-
-    msg = (msg or "").strip()
-    if not msg:
-        return {}
-
-    try:
-        data = json.loads(msg)
-
-        if isinstance(data, dict) and isinstance(data.get("body"), dict):
-            data = data["body"]
-
-        return data if isinstance(data, dict) else {}
-
-    except (json.JSONDecodeError, TypeError):
-        parsed = parse_qs(msg)
-        return {k: v[0] if isinstance(v, list) and v else v for k, v in parsed.items()}
-
-
-def ws_value(data, key, default=""):
-    value = data.get(key, default)
-    if isinstance(value, list):
-        return value[0] if value else default
-    return default if value is None else str(value)    
-        
-
-
 @app.ws('/ws/hub/{hub_id}')
-async def ws_action(msg: str, send, hub_id: str):
-    if isinstance(msg, bytes):
-        msg = msg.decode()
-
+async def ws_action(data: dict, send, hub_id: str):
     if hub_id not in hub_connections:
         hub_connections[hub_id] = []
+
     if send not in hub_connections[hub_id]:
         hub_connections[hub_id].append(send)
 
-    data = parse_ws_form(msg)
-    move = ws_value(data, 'move')
-    player_name = ws_value(data, 'player', 'Anonymous')
-    print(f"[WS PARSED] move={move} player={player_name} data={data}", flush=True)
+    move = data.get('move', '')
+    player_name = data.get('player', 'Anonymous')
 
-    if not msg or msg.strip() == '':
-        nickname = send_to_player.pop(send, None)
-        if send in hub_connections.get(hub_id, []):
-            hub_connections[hub_id].remove(send)
-        if nickname:
-            state_key = f'room:{hub_id}:state'
-            raw = r.get(state_key)
-            if raw:
-                state = json.loads(raw)
-                state.get('hands', {}).pop(nickname, None)
-                r.set(state_key, json.dumps(state))
-                note = Div(
-                    Div(f"🚪 {nickname} left the table.", cls="dealer-log-entry"),
-                    id="dealer-log", cls="dealer-log", hx_swap_oob="beforeend"
-                )
-                await broadcast_to_hub(hub_id, to_xml(note))
+    print(f"[WS DATA] move={move} player={player_name} data={data}", flush=True)
+
+    if not move:
+        print(f"[WS DEBUG] empty move data={data}", flush=True)
         return
+
     try:
-        if not move:
-            return
+        send_to_player[send] = player_name
         send_to_player[send] = player_name
         pot_key   = f'room:{hub_id}:pot'
         state_key = f'room:{hub_id}:state'
