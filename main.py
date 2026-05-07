@@ -6,7 +6,8 @@ import json
 
 hub_name = os.getenv('HUB_NAME', 'Unknown Hub')
 r = redis.Redis(host='redis', port=6379, decode_responses=True)
-aapp, rt = fast_app(secret_key=os.getenv("SESSION_SECRET", "dev-only-fallback"))
+app, rt = fast_app(secret_key=os.getenv("SESSION_SECRET", "dev-only-fallback"))
+
 hub_connections = {}
 
 send_to_player  = {}   
@@ -20,7 +21,10 @@ async def broadcast_to_hub(hub_id, message):
             except Exception:
                 dead.append(client_send)
         for d in dead:
-            hub_connections[hub_id].remove(d)
+           hub_connections[hub_id].remove(d)
+           send_to_player.pop(d, None)  
+
+
 chat_script = Script("""
     function toggleChat() {
         const panel = document.getElementById('chat-panel');
@@ -424,6 +428,7 @@ def get(session):
       Body(
             top_nav,
             Div(
+                     
                 Div(
                     Form(
                         Input(type="hidden", name="player", value=nickname),
@@ -432,17 +437,17 @@ def get(session):
                             Div(phase.upper(), cls="phase-badge", id="phase-badge"),
                             Div(*player_slots, id="players-row", cls="players-row"),
                             Div(f"POT: ${pot}", id="pot-display", cls="pot-display"),
-                            Div(*board_cards, id="board-cards", cls="board-area"),
+                            Div(*board_cards,  id="board-cards", cls="board-area"),
                             Div(*my_hole_cards, cls="my-cards"),
                             cls="table-felt"
                         ),
-                       
-                        Div(id="action-buttons-wrap", children=[action_buttons]),
-                        ws_send=True  
+                        Div(action_buttons, id="action-buttons-wrap"),
+                        ws_send=True
                     ),
                     hx_ext="ws", ws_connect=f"/ws/hub/{room}"
                 ),
                 cls="table-wood-rim"
+
             ),
             Div(
                 Div("DEALER LOG", cls="dealer-log-title"),
@@ -461,6 +466,7 @@ def get(session):
         
 
 
+@app.ws('/ws/hub/{hub_id}')
 async def ws_action(msg: str, send, hub_id: str):
     if hub_id not in hub_connections:
         hub_connections[hub_id] = []
@@ -522,7 +528,6 @@ async def ws_action(msg: str, send, hub_id: str):
             pot = r.incrby(pot_key, 100)
             game_state.setdefault('dealer_log', []).append(f"🃏 {player_name} raises $100.")
             player_phrase = f"{player_name} raised $100."
-
         else:
             return
         bot_folded = game_state.get('bot_folded', {b: False for b in BOT_NAMES})
@@ -532,6 +537,7 @@ async def ws_action(msg: str, send, hub_id: str):
             bot_cards   = game_state.get('hands', {}).get(bot_name, [])
             board_cards = game_state.get('board', [])
             result      = engine.bot_decide_move(bot_name, bot_cards, board_cards, pot, 50)
+
             if result['move'] == 'fold':
                 bot_folded[bot_name] = True
                 game_state['dealer_log'].append(f"🃏 {bot_name} folds.")
@@ -542,6 +548,7 @@ async def ws_action(msg: str, send, hub_id: str):
                 pot = r.incrby(pot_key, 50)
                 game_state['dealer_log'].append(f"🃏 {bot_name} calls.")
             bot_phrases.append((bot_name, result['phrase']))
+
         game_state['bot_folded'] = bot_folded
         game_state['dealer_log'] = game_state['dealer_log'][-10:]
         r.set(state_key, json.dumps(game_state))
@@ -581,6 +588,7 @@ async def ws_action(msg: str, send, hub_id: str):
                 phrase, cls="msg-bot"
             ))
         chat_update = Div(*chat_items, id="chat-messages", hx_swap_oob="beforeend")
+
         parts = [
             to_xml(update_pot),
             to_xml(update_phase),
@@ -592,9 +600,10 @@ async def ws_action(msg: str, send, hub_id: str):
             parts.append(to_xml(update_board))
 
         await broadcast_to_hub(hub_id, "".join(parts))
+
     except Exception as e:
         print(f"[WS ERROR] {e}")
 
 
 if __name__ == '__main__':
-    serve()
+    serve(host='0.0.0.0', port=5001)
