@@ -5,7 +5,7 @@ import redis
 import engine
 import json
 from urllib.parse import quote, unquote
-from itertools import combinations
+
 
 
 hub_name = os.getenv('HUB_NAME', 'Unknown Hub')
@@ -33,7 +33,7 @@ async def broadcast_to_hub(hub_id, message):
 PLAYER_TIMEOUT_SECONDS = 15
 
 def player_presence_key(room,player):
-    return f"room{room}:presence:{player}"
+    return f"room:{room}:presence:{player}"
 def mark_player_seen(room, player):
     if player:
         r.setex(player_presence_key(room, player), PLAYER_TIMEOUT_SECONDS, "1")
@@ -681,9 +681,7 @@ def get(session):
     if nickname not in state.get('hands', {}) and nickname not in state.get('waiting_players', []):
         state.setdefault('waiting_players', []).append(nickname)
         state.setdefault('dealer_log', []).append(f" Dealer: {nickname} joined next round.")
-    cleanup_absent_players(room,state)
-    if state.get('current_turn') in BOT_NAMES:
-        run_bot_turns_now(state)
+    cleanup_absent_players(room, state)
     save_state(room, state)
     pot = state.get('pot', 0)
     phase = state.get('phase', 'preflop')
@@ -774,18 +772,15 @@ def table_update(state, player_name):
 def get(room: str, player_name: str):
     player_name = unquote(player_name)
     mark_player_seen(room, player_name)
-
     raw = r.get(room_state_key(room))
     if not raw:
         return ""
     state = json.loads(raw)
     cleanup_absent_players(room, state)
-    if state.get('current_turn') in BOT_NAMES:
-        run_bot_turns_now(state)
     state['dealer_log'] = state.get('dealer_log', [])[-10:]
     save_state(room, state)
     return table_update(state, player_name)
-
+    
 @app.ws('/ws/hub/{hub_id}/{player_name}')
 async def ws_action(data: dict, send, hub_id: str, player_name: str):
     
