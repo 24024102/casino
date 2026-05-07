@@ -344,24 +344,57 @@ def first_player_needing_action(state, after=None):
 def reset_betting_round(state):
     players = list(state.get('hands', {}).keys())
     state['current_bet'] = 0
+    state['raises_this_street'] = 0
     state['street_bets'] = {p: 0 for p in players}
     state['acted'] = {p: False for p in players}
-    state['current_turn'] = first_player_needing_action(state)
+    state['current_turn'] = first_player_needing_action(state, after=state.get('dealer_button'))
 
-def new_game_state(humans):
+SMALL_BLIND = 50
+BIG_BLIND = 100
+MAX_RAISES_PER_STREET = 1
+def pay_to_pot(state, player,amount):
+    amount = max(0,int(amount))
+    chips = state.setdefault('chips',{}.setdefault(player, 1000))
+    paid = min(chips, amount)
+    state['chips']['player'] = chips - paid
+    state['pot'] = int(state.get('pot', 0)) + paid
+    state.setdefault('street_bets', {}).setdefault(player, 0)
+    state['street_bets'][player] += paid
+
+def new_game_state(humans, previous_dealer=None):
     humans = list(dict.fromkeys([p for p in humans if p and p not in BOT_NAMES]))
     state = engine.deal_preflop(humans)
     players = list(state.get('hands', {}).keys())
+
+    dealer_i = 0
+    if previous_dealer in players:
+        dealer_i = (players.index(previous_dealer) + 1) % len(players)
+
+    dealer = players[dealer_i]
+    sb = players[(dealer_i + 1) % len(players)]
+    bb = players[(dealer_i + 2) % len(players)]
+
     state['pot'] = 0
     state['chips'] = {p: 1000 for p in players}
     state['folded'] = {p: False for p in players}
     state['street_bets'] = {p: 0 for p in players}
     state['acted'] = {p: False for p in players}
-    state['current_bet'] = 0
+    state['current_bet'] = BIG_BLIND
+    state['raises_this_street'] = 0
+    state['dealer_button'] = dealer
     state['waiting_players'] = []
     state['winners'] = []
-    state['pot_paid'] = False
-    state['current_turn'] = first_player_needing_action(state)
+
+    pay_to_pot(state, sb, SMALL_BLIND)
+    pay_to_pot(state, bb, BIG_BLIND)
+
+    state['current_turn'] = first_player_needing_action(state, after=bb)
+    state['dealer_log'] = [
+        '🃏 Dealer: New hand started.',
+        f'🟡 Dealer button: {dealer}.',
+        f'🃏 {sb} posts small blind ${SMALL_BLIND}.',
+        f'🃏 {bb} posts big blind ${BIG_BLIND}.',
+    ]
     return state
 
 def render_player_slots(state, viewer=None):
@@ -410,17 +443,18 @@ def apply_move_to_state(state, player_name, move, phrase=None):
         state['dealer_log'].append(f"🃏 {player_name} folds.")
     elif move == 'call':
         needed = max(0, state['current_bet'] - state['street_bets'].get(player_name, 0))
-        state['pot'] += needed
-        state['street_bets'][player_name] += needed
+        paid = pay_to_pot(state, player_name, needed)
         state['acted'][player_name] = True
-        state['dealer_log'].append(f"🃏 {player_name} {'checks' if needed == 0 else f'calls ${needed}'}.")
+        state['dealer_log'].append(f"🃏 {player_name} {'checks' if paid == 0 else f'calls ${paid}'}.")
     elif move == 'raise':
+        if state.get('raises_this_street', 0) >= MAX_RAISES_PER_STREET:
+            return apply_move_to_state(state, player_name, 'call', phrase)
         state['current_bet'] += RAISE_AMOUNT
         needed = state['current_bet'] - state['street_bets'].get(player_name, 0)
-        state['pot'] += needed
-        state['street_bets'][player_name] += needed
+        paid = pay_to_pot(state, player_name, needed)
         state['acted'][player_name] = True
-        state['dealer_log'].append(f"🃏 {player_name} raises ${RAISE_AMOUNT}.")
+        state['raises_this_street'] = state.get('raises_this_street', 0) + 1
+        state['dealer_log'].append(f"🃏 {player_name} raises +${RAISE_AMOUNT}.")
     if phrase:
         state['dealer_log'].append(f"💬 {phrase}")
     advance_turn_after_action(state, player_name)
@@ -443,6 +477,7 @@ async def run_bot_turns(state):
         if move not in ('fold', 'call', 'raise'):
             move = 'call'
         apply_move_to_state(state, bot_name, move, result.get('phrase'))
+
 @rt('/login')
 def post(session, nickname: str, room_choice: str): 
     session['nickname'] = nickname
@@ -564,7 +599,7 @@ def get(session):
                     Div(f"POT: ${pot}", id="pot-display", cls="pot-display"),
                     Div(*board_cards, id="board-cards", cls="board-area"),
                     Div(
-                        Div(*my_hole_cards, cls="my-cards"),
+                        Div(*my_hole_cards, id="my-cards", cls="my-cards"),
                         action_buttons,
                         cls="my-hand-area"
                     ),
@@ -587,6 +622,21 @@ def get(session):
 
         )
     )
+def table_update(state, player_name):
+    board_cards = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('board', [])]
+    my_cards = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('hands', {}).get(player_name, [])]
+
+    return (
+        Div(state.get('phase', 'preflop').upper(), cls="phase-badge", id="phase-badge", hx_swap_oob="true"),
+        Div(*render_player_slots(state, player_name), id="players-row", cls="players-row", hx_swap_oob="true"),
+        Div(f"POT: ${state.get('pot', 0)}", id="pot-display", cls="pot-display", hx_swap_oob="true"),
+        Div(*board_cards, id="board-cards", cls="board-area", hx_swap_oob="true"),
+        Div(*my_cards, id="my-cards", cls="my-cards", hx_swap_oob="true"),
+        Div(Div("DEALER LOG", cls="dealer-log-title"),
+            *[Div(e, cls="dealer-log-entry") for e in state.get('dealer_log', [])],
+            id="dealer-log", cls="dealer-log", hx_swap_oob="true"),
+        ActionButtons(player_name, state, oob=True),
+    )
 
 @app.ws('/ws/hub/{hub_id}/{player_name}')
 async def ws_action(data: dict, send, hub_id: str, player_name: str):
@@ -599,9 +649,9 @@ async def ws_action(data: dict, send, hub_id: str, player_name: str):
     if move == 'restart':
         humans = [p for p in state.get('hands', {}) if p not in BOT_NAMES]
         humans += state.get('waiting_players', [])
-        state = new_game_state(humans)
+        state = new_game_state(humans, previous_dealer=state.get('dealer_button'))
         save_state(hub_id, state)
-        return Div(Script("window.location.reload()"))
+        return table_update(state, player_name)
 
     if state.get('phase') == 'showdown':
         return ActionButtons(player_name, state, oob=True)
@@ -615,14 +665,6 @@ async def ws_action(data: dict, send, hub_id: str, player_name: str):
     save_state(hub_id, state)
     apply_move_to_state(state, player_name, move)
     await run_bot_turns(state)
-    if move not in ('fold', 'call', 'raise'):
-        return
-    apply_move_to_state(state, player_name, move)
-    await run_bot_turns(state)
-    state['dealer_log'] = state['dealer_log'][-10:]
-    save_state(hub_id, state)
-    state['dealer_log'] = state['dealer_log'][-10:]
-    save_state(hub_id, state)
     board_cards = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('board', [])]
     return (
         Div(state.get('phase', 'preflop').upper(), cls="phase-badge", id="phase-badge", hx_swap_oob="true"),
