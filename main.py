@@ -380,18 +380,18 @@ def get(session):
     board_cards   = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('board', [])]
     my_hole_cards = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('hands', {}).get(nickname, [])]
     log_entries   = state.get('dealer_log', ['🃏 Dealer: Welcome to the table.'])
-    if phase == 'showdown':
-        action_buttons = Div(
-            Button("NEW ROUND 🔄", type="submit", onclick="document.getElementById('move-input').value='restart'", cls="action-btn btn-raise"),
-            cls="action-bar"
-        )
+    if current_phase == 'showdown':
+            new_buttons = Div(
+                Button("NEW ROUND 🔄", ws_send=True, hx_vals=f'{{"move": "restart", "player": "{player_name}"}}', cls="action-btn btn-new-round"),
+                cls="action-bar", id="action-buttons-wrap", hx_swap_oob="true"
+            )
     else:
-        action_buttons = Div(
-            Button("FOLD",  type="submit", onclick="document.getElementById('move-input').value='fold'", cls="action-btn btn-fold"),
-            Button("CALL",  type="submit", onclick="document.getElementById('move-input').value='call'", cls="action-btn btn-call"),
-            Button("RAISE", type="submit", onclick="document.getElementById('move-input').value='raise'", cls="action-btn btn-raise"),
-            cls="action-bar"
-        )
+        new_buttons = Div(
+            Button("FOLD",  ws_send=True, hx_vals=f'{{"move": "fold", "player": "{player_name}"}}', cls="action-btn btn-fold"),
+            Button("CALL",  ws_send=True, hx_vals=f'{{"move": "call", "player": "{player_name}"}}', cls="action-btn btn-call"),
+             Button("RAISE", ws_send=True, hx_vals=f'{{"move": "raise", "player": "{player_name}"}}', cls="action-btn btn-raise"),
+             cls="action-bar", id="action-buttons-wrap", hx_swap_oob="true"
+            )
     top_nav = Div(
         Div("♠ CASINO NETWORK", cls="nav-brand"),
         Div(
@@ -425,30 +425,23 @@ def get(session):
             chat_script,
             casino_style
         ),
-      Body(
+    Body(
             top_nav,
             Div(
-                     
                 Div(
-                    Form(
-                        Input(type="hidden", name="player", value=nickname),
-                        Input(type="hidden", name="move",   id="move-input", value=""),
-                        Div(
-                            Div(phase.upper(), cls="phase-badge", id="phase-badge"),
-                            Div(*player_slots, id="players-row", cls="players-row"),
-                            Div(f"POT: ${pot}", id="pot-display", cls="pot-display"),
-                            Div(*board_cards,  id="board-cards", cls="board-area"),
-                            Div(*my_hole_cards, cls="my-cards"),
-                            cls="table-felt"
-                        ),
-                        Div(action_buttons, id="action-buttons-wrap"),
-                        ws_send=True
-                    ),
-                    hx_ext="ws", ws_connect=f"/ws/hub/{room}"
+                    Div(phase.upper(), cls="phase-badge", id="phase-badge"),
+                    Div(*player_slots, id="players-row", cls="players-row"),
+                    Div(f"POT: ${pot}", id="pot-display", cls="pot-display"),
+                    Div(*board_cards,  id="board-cards", cls="board-area"),
+                    Div(*my_hole_cards, cls="my-cards"),
+                    action_buttons,
+                    cls="table-felt"
                 ),
+                hx_ext="ws", ws_connect=f"/ws/hub/{room}",
                 cls="table-wood-rim"
-
             ),
+
+            
             Div(
                 Div("DEALER LOG", cls="dealer-log-title"),
                 *[Div(e, cls="dealer-log-entry") for e in log_entries],
@@ -509,7 +502,7 @@ async def ws_action(msg: str, send, hub_id: str):
             new_state = engine.deal_preflop(humans)
             r.set(state_key, json.dumps(new_state))
             r.set(pot_key, 0)
-            await broadcast_to_hub(hub_id, '<script>window.location.reload();</script>')
+            await broadcast_to_hub(hub_id, '<div id="action-buttons-wrap" hx-swap-oob="true"><script>window.location.reload();</script></div>')
             return
         bot_phrases  = []
         update_board = ""
