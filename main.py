@@ -1,9 +1,11 @@
 import os
+import asyncio
 from fasthtml.common import *
 import redis
 import engine
 import json
-from urllib.parse import parse_qs
+from urllib.parse import quote, unquote
+
 
 hub_name = os.getenv('HUB_NAME', 'Unknown Hub')
 r = redis.Redis(host='redis', port=6379, decode_responses=True)
@@ -277,7 +279,86 @@ def PokerCard(rank, suit, color_class):
     )
 def CardBack():
     return Div("🂠", cls="card-back")
+RAISE_AMOUNT = 100
+BOT_THINK_SECONDS = 0.8
+def ActionButtons(player_name, state, oob=False):
+    attrs = {"cls": "action-bar", "id": "action-buttons-wrap"}
+    if oob: attrs["hx_swap_oob"] = "true"
 
+    if state.get('phase') == 'showdown':
+        return Div(
+            Button("NEW ROUND 🔄", type="button", cls="action-btn btn-new-round",
+                   ws_send=True, hx_vals=json.dumps({"move": "restart"})),
+            **attrs
+        )
+
+    if state.get('current_turn') != player_name:
+        return Div(
+            Div(f"WAITING: {state.get('current_turn', 'dealer')}", cls="turn-note"),
+            Button("FOLD", type="button", cls="action-btn btn-fold", disabled=True),
+            Button("CALL", type="button", cls="action-btn btn-call", disabled=True),
+            Button("RAISE", type="button", cls="action-btn btn-raise", disabled=True),
+            **attrs
+        )
+
+    needed = max(0, int(state.get('current_bet', 0)) - int(state.get('street_bets', {}).get(player_name, 0)))
+    call_label = "CHECK" if needed == 0 else f"CALL ${needed}"
+
+    return Div(
+        Button("FOLD", type="button", cls="action-btn btn-fold", ws_send=True, hx_vals=json.dumps({"move": "fold"})),
+        Button(call_label, type="button", cls="action-btn btn-call", ws_send=True, hx_vals=json.dumps({"move": "call"})),
+        Button(f"RAISE ${RAISE_AMOUNT}", type="button", cls="action-btn btn-raise", ws_send=True, hx_vals=json.dumps({"move": "raise"})),
+        **attrs
+    )
+def room_state_key(room):return f'room:{room}:state'
+def room_pot_key(room): return f'room:{room}:pot'
+def save_state(room,state):
+    r.set(room_state_key(room), json.dumps(state))
+    r.set(room_pot_key(room), int(state.get('pot', 0 )))
+def active_players(state):
+    return [ p for p in state.get('hands', {}) if not state.get('folded', {}).get(p, False)]
+def players_needing_action(state):
+    if state.get('phase') == 'showdown': return []
+    active = active_players(state)
+    if len(active) <= 1: return[]
+    current_bet = int(state.get('current_bet', 0))
+    return [
+        p for p in active
+        if not state.get('acted', {}).get(p, False)
+        or int(state.get('street_bets', {}).get(p, 0)) < current_bet
+    ]
+def first_player_needing_action(state, after=None):
+    need = set(players_needing_action(state))
+    order = list(state.get('hands', {}).keys())
+    if not need or not order: return None
+    start = (order.index(after) + 1) % len(order) if after in order else 0
+    for i in range(len(order)):
+        p = order[(start + i) % len(order)]
+        if p in need: return p
+    return None
+
+def reset_betting_round(state):
+    players = list(state.get('hands', {}).keys())
+    state['current_bet'] = 0
+    state['street_bets'] = {p: 0 for p in players}
+    state['acted'] = {p: False for p in players}
+    state['current_turn'] = first_player_needing_action(state)
+
+def new_game_state(humans):
+    humans = list(dict.fromkeys([p for p in humans if p and p not in BOT_NAMES]))
+    state = engine.deal_preflop(humans)
+    players = list(state.get('hands', {}).keys())
+    state['pot'] = 0
+    state['chips'] = {p: 1000 for p in players}
+    state['folded'] = {p: False for p in players}
+    state['street_bets'] = {p: 0 for p in players}
+    state['acted'] = {p: False for p in players}
+    state['current_bet'] = 0
+    state['waiting_players'] = []
+    state['winners'] = []
+    state['pot_paid'] = False
+    state['current_turn'] = first_player_needing_action(state)
+    return state
 @rt('/login')
 def post(session, nickname: str, room_choice: str): 
     session['nickname'] = nickname
@@ -352,16 +433,19 @@ def get(session):
     room = session.get('room_id', 'Vegas')
     pot_key = f'room:{room}:pot'
     state_key = f'room:{room}:state'
-    if not r.exists(state_key):
-        init_state = engine.deal_preflop([nickname])
-        r.set(state_key, json.dumps(init_state))
-        r.set(pot_key, 0)
-    state = json.loads(r.get(state_key))
-    pot = r.get(pot_key) or "0"
-    if nickname not in state.get('hands', {}):
-        state['hands'][nickname] = []
-        r.set(state_key, json.dumps(state))
-    pot   = r.get(pot_key) or "0"
+    raw = r.get(room_state_key(room))
+    if raw:
+        state = json.loads(raw)
+        if 'current_turn' not in state or 'folded' not in state:
+            state = new_game_state([nickname])
+    else:
+        state = new_game_state([nickname])
+    if nickname not in state.get('hands', {}) and nickname not in state.get('waiting_players', []):
+        state.setdefault('waiting_players', []).append(nickname)
+        state.setdefault('dealer_log', []).append(f" Dealer: {nickname} joined next round.")
+    save_state(room, state)
+    pot = state.get('pot', 0)
+    phase = state.get('phase', 'preflop')
     phase = state.get('phase', 'preflop')
     player_slots = []
     for p, cards in state.get('hands', {}).items():
@@ -384,43 +468,7 @@ def get(session):
     board_cards   = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('board', [])]
     my_hole_cards = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('hands', {}).get(nickname, [])]
     log_entries   = state.get('dealer_log', ['🃏 Dealer: Welcome to the table.'])
-    if phase == 'showdown':
-        action_buttons = Div(
-            Button(
-                "NEW ROUND 🔄",
-                type="button",
-                cls="action-btn btn-new-round",
-                ws_send=True,
-                hx_vals=json.dumps({"player": nickname, "move": "restart"})
-            ),
-            cls="action-bar",
-            id="action-buttons-wrap"
-        )
-    else:
-        action_buttons = Div(
-            Button(
-                "FOLD",
-                type="button",
-                cls="action-btn btn-fold",
-                ws_send=True,
-                hx_vals=json.dumps({"player": nickname, "move": "fold"})
-            ),
-            Button(
-                "CALL",
-                type="button",
-                cls="action-btn btn-call",
-                ws_send=True,
-                hx_vals=json.dumps({"player": nickname, "move": "call"})
-            ),
-            Button(
-                "RAISE",
-                type="button",
-                cls="action-btn btn-raise",
-                ws_send=True,
-                hx_vals=json.dumps({"player": nickname, "move": "raise"})
-            )
-        
-        )
+    action_buttons = ActionButtons(nickname, state)
     top_nav = Div(
         Div("♠ CASINO NETWORK FIX-TEST", cls="nav-brand"),
 
@@ -474,136 +522,73 @@ def get(session):
         )
     )
 
-@app.ws('/ws/hub/{hub_id}')
-async def ws_action(data: dict, send, hub_id: str):
-    if hub_id not in hub_connections:
-        hub_connections[hub_id] = []
-
-    if send not in hub_connections[hub_id]:
-        hub_connections[hub_id].append(send)
-
+@app.ws('/ws/hub/{hub_id}/{player_name}')
+async def ws_action(data: dict, send, hub_id: str, player_name: str):
+    
+    player_name = unquote(player_name)
     move = data.get('move', '')
-    player_name = data.get('player', 'Anonymous')
+    raw = r.get(room_state_key(hub_id))
+    if not raw: return
+    state = json.loads(raw)
+    if move == 'restart':
+        humans = [p for p in state.get('hands', {}) if p not in BOT_NAMES]
+        humans += state.get('waiting_players', [])
+        state = new_game_state(humans)
+        save_state(hub_id, state)
+        return Div(Script("window.location.reload()"))
 
-    print(f"[WS DATA] move={move} player={player_name} data={data}", flush=True)
-
-    if not move:
-        print(f"[WS DEBUG] empty move data={data}", flush=True)
+    if state.get('phase') == 'showdown':
+        return ActionButtons(player_name, state, oob=True)
+    if player_name != state.get('current_turn'):
+        return ActionButtons(player_name, state, oob=True)
+    if move == 'fold':
+        state['folded'][player_name] = True
+        state['acted'][player_name] = True
+        state['dealer_log'].append(f"🃏 {player_name} folds.")
+    elif move == 'call':
+        needed = max(0, state['current_bet'] - state['street_bets'].get(player_name, 0))
+        state['pot'] += needed
+        state['street_bets'][player_name] += needed
+        state['acted'][player_name] = True
+        state['dealer_log'].append(f"🃏 {player_name} {'checks' if needed == 0 else f'calls ${needed}'}.")
+    elif move == 'raise':
+        state['current_bet'] += RAISE_AMOUNT
+        needed = state['current_bet'] - state['street_bets'].get(player_name, 0)
+        state['pot'] += needed
+        state['street_bets'][player_name] += needed
+        state['acted'][player_name] = True
+        state['dealer_log'].append(f"🃏 {player_name} raises ${RAISE_AMOUNT}.")
+    else:
         return
-
-    try:
-        send_to_player[send] = player_name
-        send_to_player[send] = player_name
-        pot_key   = f'room:{hub_id}:pot'
-        state_key = f'room:{hub_id}:state'
-        pot       = int(r.get(pot_key) or "0")
-        raw = r.get(state_key)
-        if not raw:
-            return
-        game_state = json.loads(raw)
-        if move == 'restart':
-            humans    = [p for p in game_state.get('hands', {}) if p not in BOT_NAMES]
-            new_state = engine.deal_preflop(humans)
-            r.set(state_key, json.dumps(new_state))
-            r.set(pot_key, 0)
-            await broadcast_to_hub(hub_id, '<div id="action-buttons-wrap" hx-swap-oob="true"><script>window.location.reload();</script></div>')
-            return
-        bot_phrases  = []
-        update_board = ""
-        advance_phase = False
-
-        if move == 'fold':
-            game_state.setdefault('dealer_log', []).append(f"🃏 {player_name} folds.")
-            game_state.setdefault('human_folded', {})[player_name] = True
-            game_state['phase'] = 'showdown'
-            game_state['dealer_log'].append("🃏 Dealer: Player folded. Round is over.")
-
-        elif move == 'call':
-            pot = r.incrby(pot_key, 50)
-            game_state.setdefault('dealer_log', []).append(f"🃏 {player_name} calls $50.")
-            advance_phase = True
-
-        elif move == 'raise':
-            pot = r.incrby(pot_key, 100)
-            game_state.setdefault('dealer_log', []).append(f"🃏 {player_name} raises $100.")
-            advance_phase = True
-
+    if len(active_players(state)) <= 1:
+        state['phase'] = 'showdown'
+        state['current_turn'] = None
+    else:
+        nxt = first_player_needing_action(state, after=player_name)
+        if nxt:
+            state['current_turn'] = nxt
+        elif state['phase'] == 'river':
+            state['phase'] = 'showdown'
+            state['current_turn'] = None
+            state['dealer_log'].append("🃏 Dealer: SHOWDOWN!")
         else:
-            return
+            engine.deal_next_phase(state)
+            reset_betting_round(state)
 
-        bot_folded = game_state.get('bot_folded', {b: False for b in BOT_NAMES})
+    state['dealer_log'] = state['dealer_log'][-10:]
+    save_state(hub_id, state)
 
-        if game_state.get('phase') != 'showdown':
-            for bot_name in BOT_NAMES:
-                if bot_folded.get(bot_name):
-                    continue
+    board_cards = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('board', [])]
 
-                bot_cards = game_state.get('hands', {}).get(bot_name, [])
-                board_cards = game_state.get('board', [])
-                result = engine.bot_decide_move(bot_name, bot_cards, board_cards, pot, 50)
-
-                if result['move'] == 'fold':
-                    bot_folded[bot_name] = True
-                    game_state['dealer_log'].append(f"🃏 {bot_name} folds.")
-                elif result['move'] == 'raise':
-                    pot = r.incrby(pot_key, 100)
-                    game_state['dealer_log'].append(f"🃏 {bot_name} raises $100.")
-                else:
-                    pot = r.incrby(pot_key, 50)
-                    game_state['dealer_log'].append(f"🃏 {bot_name} calls.")
-
-        game_state['bot_folded'] = bot_folded
-
-        if advance_phase and game_state.get('phase') != 'showdown':
-            game_state = engine.deal_next_phase(game_state)
-
-        game_state['dealer_log'] = game_state['dealer_log'][-10:]
-        r.set(state_key, json.dumps(game_state))
-
-        board_html = [PokerCard(c['rank'], c['suit'], c['color']) for c in game_state.get('board', [])]
-        update_board = Div(*board_html, id="board-cards", cls="board-area", hx_swap_oob="true")
-
-        game_state['bot_folded'] = bot_folded
-        game_state['dealer_log'] = game_state['dealer_log'][-10:]
-        r.set(state_key, json.dumps(game_state))
-        current_phase = game_state.get('phase', 'preflop')
-        update_pot    = Div(f"POT: ${r.get(pot_key)}", id="pot-display", cls="pot-display", hx_swap_oob="true")
-        update_phase  = Div(current_phase.upper(), cls="phase-badge", id="phase-badge", hx_swap_oob="true")
-        update_log    = Div(
-            Div("DEALER LOG", cls="dealer-log-title"),
-            *[Div(e, cls="dealer-log-entry") for e in game_state.get('dealer_log', [])],
-            id="dealer-log", cls="dealer-log", hx_swap_oob="true"
-        )
-        parts = [
-            to_xml(update_pot),
-            to_xml(update_phase),
-            to_xml(update_log),
-        ]
-
-        if current_phase == 'showdown':
-           new_buttons = Div(
-        Button(
-        "NEW ROUND 🔄",
-        type="button",
-        cls="action-btn",
-        ws_send=True,
-        hx_vals=json.dumps({"player": player_name, "move": "restart"})
-        ),
-        cls="action-bar",
-        id="action-buttons-wrap",
-        hx_swap_oob="true"
-)
-
-        parts.append(to_xml(new_buttons))
-
-        if update_board:
-            parts.append(to_xml(update_board))
-
-        await broadcast_to_hub(hub_id, "".join(parts))
-
-    except Exception as e:
-        print(f"[WS ERROR] {e}")
-
+    return (
+        Div(state.get('phase', 'preflop').upper(), cls="phase-badge", id="phase-badge", hx_swap_oob="true"),
+        Div(f"POT: ${state.get('pot', 0)}", id="pot-display", cls="pot-display", hx_swap_oob="true"),
+        Div(*board_cards, id="board-cards", cls="board-area", hx_swap_oob="true"),
+        Div(Div("DEALER LOG", cls="dealer-log-title"),
+            *[Div(e, cls="dealer-log-entry") for e in state.get('dealer_log', [])],
+            id="dealer-log", cls="dealer-log", hx_swap_oob="true"),
+        ActionButtons(player_name, state, oob=True),
+    )
 
 if __name__ == '__main__':
     serve(host='0.0.0.0', port=5001)
