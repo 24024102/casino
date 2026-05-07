@@ -263,14 +263,13 @@ casino_style = Style("""
     /* ── CARDS ── */
     .board-area { display: flex; justify-content: center; gap: 8px; min-height: 130px; margin-bottom: 30px; align-items: center; }
     .card {
-        background: linear-gradient(135deg, #fff 0%, #f5f5f5 100%);
-        border-radius: 8px; width: 80px; height: 115px;
-        box-shadow: 3px 6px 20px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.8);
-        display: inline-flex; flex-direction: column; justify-content: space-between;
-        padding: 6px; font-family: 'Cinzel', serif; border: 1px solid #ddd;
-        margin: 0; transition: transform 0.2s; position: relative;
-        animation: cardDeal 0.3s ease-out;
-    }
+    background: linear-gradient(135deg, #fff 0%, #f5f5f5 100%);
+    border-radius: 8px; width: 80px; height: 115px;
+    box-shadow: 3px 6px 20px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.8);
+    display: inline-flex; flex-direction: column; justify-content: space-between;
+    padding: 6px; font-family: 'Cinzel', serif; border: 1px solid #ddd;
+    margin: 0; transition: transform 0.2s; position: relative;
+}
     @keyframes cardDeal { from { opacity: 0; transform: translateY(-20px) scale(0.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
     .card:hover { transform: translateY(-12px) scale(1.05); z-index: 10; }
     .card.red { color: #c62828; }
@@ -795,7 +794,7 @@ def get(room: str, player_name: str):
     cleanup_absent_players(room, state)
     state['dealer_log'] = state.get('dealer_log', [])[-10:]
     save_state(room, state)
-    return sync_update(state, player_name)
+    return table_update(state, player_name)
     
 @app.ws('/ws/hub/{hub_id}/{player_name}')
 async def ws_action(data: dict, send, hub_id: str, player_name: str):
