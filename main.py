@@ -589,14 +589,21 @@ def run_bot_turns_now(state):
     while state.get('phase') != 'showdown' and state.get('current_turn') in BOT_NAMES:
         bot_take_turn(state)
 async def run_bot_turns(state, send=None, player_name=None, hub_id=None):
-   while state.get('phase') != 'showdown' and state.get('current_turn') in BOT_NAMES:
-      bot_name = state.get('current_turn')
-      state['thinking_bot'] = bot_name
-      if send and player_name:
-        await send("".join(to_xml(x) for x in table_update(state, player_name)))
-      await asyncio.sleep(BOT_THINK_SECONDS)
-      state.pop('thinking_bot', None)
-      bot_take_turn(state)
+    while state.get('phase') != 'showdown' and state.get('current_turn') in BOT_NAMES:
+        bot_name = state.get('current_turn')
+        state['thinking_bot'] = bot_name
+        if hub_id:
+            save_state(hub_id, state)
+        if send and player_name:
+            await send("".join(to_xml(x) for x in table_update(state, player_name)))
+        await asyncio.sleep(BOT_THINK_SECONDS)
+        state.pop('thinking_bot', None)
+        bot_take_turn(state)
+        state['dealer_log'] = state.get('dealer_log', [])[-10:]
+        if hub_id:
+            save_state(hub_id, state)
+        if send and player_name:
+            await send("".join(to_xml(x) for x in table_update(state, player_name)))
 
 @rt('/login')
 def post(session, nickname: str, room_choice: str): 
@@ -810,6 +817,7 @@ async def ws_action(data: dict, send, hub_id: str, player_name: str):
     if player_name != state.get('current_turn'):
      return ActionButtons(player_name, state, oob=True)
     apply_move_to_state(state, player_name, move)
+    save_state(hub_id, state)
     await run_bot_turns(state, send, player_name, hub_id)
     state['dealer_log'] = state['dealer_log'][-10:]
     save_state(hub_id, state)
