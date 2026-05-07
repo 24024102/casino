@@ -3,6 +3,7 @@ from fasthtml.common import *
 import redis
 import engine
 import json
+from urllib.parse import parse_qs
 
 hub_name = os.getenv('HUB_NAME', 'Unknown Hub')
 r = redis.Redis(host='redis', port=6379, decode_responses=True)
@@ -446,8 +447,9 @@ def get(session):
                         cls="my-hand-area"
                     ),
                     cls="table-felt"
-                ),
-                hx_ext="ws", ws_connect=f"/ws/hub/{room}",
+                )
+                 **{"hx-ext": "ws"},
+                ws_connect=f"/ws/hub/{room}",
                 cls="table-wood-rim"
             ),
             
@@ -470,6 +472,9 @@ def get(session):
 
 @app.ws('/ws/hub/{hub_id}')
 async def ws_action(msg: str, send, hub_id: str):
+    data = parse_qs(msg)
+    move = data.get('move', [''])[0]
+    player_name = data.get('player', ['Anonymous'])[0]
     if hub_id not in hub_connections:
         hub_connections[hub_id] = []
     if send not in hub_connections[hub_id]:
@@ -564,17 +569,32 @@ async def ws_action(msg: str, send, hub_id: str):
         )
         if current_phase == 'showdown':
             new_buttons = Div(
-                Button("NEW ROUND 🔄", type="button", ws_send=True, hx_vals={"move": "restart", "player": player_name}, cls="action-btn btn-new-round"),
-                cls="action-bar", id="action-buttons-wrap", hx_swap_oob="true"
-            )
-        else:
-            new_buttons = Div(
-                Button("FOLD",  type="button", ws_send=True, hx_vals={"move": "fold", "player": player_name}, cls="action-btn btn-fold"),
-                Button("CALL",  type="button", ws_send=True, hx_vals={"move": "call", "player": player_name}, cls="action-btn btn-call"),
-                Button("RAISE", type="button", ws_send=True, hx_vals={"move": "raise", "player": player_name}, cls="action-btn btn-raise"),
-                cls="action-bar", id="action-buttons-wrap", hx_swap_oob="true"
-            )
 
+    Form(
+        Input(type="hidden", name="player", value=player_name),
+        Input(type="hidden", name="move", value="fold"),
+        Button("FOLD", type="submit", cls="action-btn btn-fold"),
+        ws_send=True,
+    ),
+
+    Form(
+        Input(type="hidden", name="player", value=player_name),
+        Input(type="hidden", name="move", value="call"),
+        Button("CALL", type="submit", cls="action-btn btn-call"),
+        ws_send=True,
+    ),
+
+    Form(
+        Input(type="hidden", name="player", value=player_name),
+        Input(type="hidden", name="move", value="raise"),
+        Button("RAISE", type="submit", cls="action-btn btn-raise"),
+        ws_send=True,
+    ),
+
+    cls="action-bar",
+    id="action-buttons-wrap",
+    hx_swap_oob="true"
+)
         chat_items = [Div(
             Div(f"{player_name}:", style="color:#d4af37;font-size:11px;font-family:Cinzel,serif;"),
             player_phrase, cls="msg-player"
