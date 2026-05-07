@@ -6,8 +6,11 @@ import json
 
 hub_name = os.getenv('HUB_NAME', 'Unknown Hub')
 r = redis.Redis(host='redis', port=6379, decode_responses=True)
-app, rt = fast_app(secret_key="1234")
+aapp, rt = fast_app(secret_key=os.getenv("SESSION_SECRET", "dev-only-fallback"))
 hub_connections = {}
+
+send_to_player  = {}   
+BOT_NAMES = engine.BOT_NAMES
 async def broadcast_to_hub(hub_id, message):
     if hub_id in hub_connections:
         dead = []
@@ -418,35 +421,24 @@ def get(session):
             chat_script,
             casino_style
         ),
-        Body(
-            top_nav,  
+      Body(
+            top_nav,
             Div(
                 Div(
-                    Div(
-                       
-                        Div(phase.upper(), cls="phase-badge", id="phase-badge"),
-                        Div(*player_slots, id="players-row", cls="players-row"),
-                        Div(f"POT: ${pot}", id="pot-display", cls="pot-display"),
-                        Div(*board_cards, id="board-cards", cls="board-area"),
+                    Form(
+                        Input(type="hidden", name="player", value=nickname),
+                        Input(type="hidden", name="move",   id="move-input", value=""),
                         Div(
+                            Div(phase.upper(), cls="phase-badge", id="phase-badge"),
+                            Div(*player_slots, id="players-row", cls="players-row"),
+                            Div(f"POT: ${pot}", id="pot-display", cls="pot-display"),
+                            Div(*board_cards, id="board-cards", cls="board-area"),
                             Div(*my_hole_cards, cls="my-cards"),
-                            Form(
-                                Input(type="hidden", name="player", value=nickname),
-                                Input(type="hidden", name="move", id="move-input", value=""),
-                               Div(
-                                    Button("NEW ROUND 🔄", type="submit", onclick="document.getElementById('move-input').value='restart'", cls="action-btn btn-raise"),
-                                    cls="action-bar"
-                                ) if phase == 'showdown' else Div(
-                                    Button("FOLD",  type="submit", onclick="document.getElementById('move-input').value='fold'", cls="action-btn btn-fold"),
-                                    Button("CALL",  type="submit", onclick="document.getElementById('move-input').value='call'", cls="action-btn btn-call"),
-                                    Button("RAISE", type="submit", onclick="document.getElementById('move-input').value='raise'", cls="action-btn btn-raise"),
-                                    cls="action-bar"
-                                ),
-                                ws_send=True
-                            ),
-                            cls="my-hand-area"
+                            cls="table-felt"
                         ),
-                        cls="table-felt"
+                       
+                        Div(id="action-buttons-wrap", children=[action_buttons]),
+                        ws_send=True  
                     ),
                     hx_ext="ws", ws_connect=f"/ws/hub/{room}"
                 ),
@@ -458,141 +450,148 @@ def get(session):
                 id="dealer-log", cls="dealer-log"
             ),
             Button("💬 Chat", onclick="toggleChat()", cls="chat-btn"),
-            Div(
-                Div("ROOM CHAT", cls="chat-header"),
-                Div(id="chat-messages"),
-                id="chat-panel"
-            ),
-            cls="page-wrap",
-            hx_ext="ws", ws_connect=f"/ws/hub/{room}"
+            Div(Div("ROOM CHAT", cls="chat-header"), Div(id="chat-messages"), id="chat-panel"),
+            cls="page-wrap"
+
         )
     )
-        
-    
+
         
     
         
 
 
-@app.ws('/ws/hub/{hub_id}')
 async def ws_action(msg: str, send, hub_id: str):
     if hub_id not in hub_connections:
         hub_connections[hub_id] = []
     if send not in hub_connections[hub_id]:
         hub_connections[hub_id].append(send)
-
+    if not msg or msg.strip() == '':
+        nickname = send_to_player.pop(send, None)
+        if send in hub_connections.get(hub_id, []):
+            hub_connections[hub_id].remove(send)
+        if nickname:
+            state_key = f'room:{hub_id}:state'
+            raw = r.get(state_key)
+            if raw:
+                state = json.loads(raw)
+                state.get('hands', {}).pop(nickname, None)
+                r.set(state_key, json.dumps(state))
+                note = Div(
+                    Div(f"🚪 {nickname} left the table.", cls="dealer-log-entry"),
+                    id="dealer-log", cls="dealer-log", hx_swap_oob="beforeend"
+                )
+                await broadcast_to_hub(hub_id, to_xml(note))
+        return
     try:
-        data = json.loads(msg)
-        move = data.get('move')
+        data        = json.loads(msg)
+        move        = data.get('move', '').strip()
         player_name = data.get('player', 'Anonymous')
 
         if not move:
             return
-
+        send_to_player[send] = player_name
         pot_key   = f'room:{hub_id}:pot'
         state_key = f'room:{hub_id}:state'
-
-        pot = int(r.get(pot_key) or "0")
-
-        raw_state = r.get(state_key)
-        if not raw_state:
+        pot       = int(r.get(pot_key) or "0")
+        raw = r.get(state_key)
+        if not raw:
             return
-        game_state = json.loads(raw_state)
+        game_state = json.loads(raw)
         if move == 'restart':
-            humans = [p for p in game_state.get('hands', {}).keys() if p not in ['Toxic Senior', 'OOM-Killer']]
+            humans    = [p for p in game_state.get('hands', {}) if p not in BOT_NAMES]
             new_state = engine.deal_preflop(humans)
             r.set(state_key, json.dumps(new_state))
             r.set(pot_key, 0)
             await broadcast_to_hub(hub_id, '<script>window.location.reload();</script>')
             return
-
         bot_phrases  = []
         update_board = ""
-
         if move == 'fold':
-            game_state.setdefault('dealer_log', []).append(f"🃏 Dealer: {player_name} folds.")
+            game_state.setdefault('dealer_log', []).append(f"🃏 {player_name} folds.")
             player_phrase = f"{player_name} folded."
-
         elif move == 'call':
             pot = r.incrby(pot_key, 50)
-            game_state.setdefault('dealer_log', []).append(f"🃏 Dealer: {player_name} calls $50.")
+            game_state.setdefault('dealer_log', []).append(f"🃏 {player_name} calls $50.")
             player_phrase = f"{player_name} called $50."
-
-            game_state   = engine.deal_next_phase(game_state)
+            game_state    = engine.deal_next_phase(game_state)
             r.set(state_key, json.dumps(game_state))
-
-            board_html   = [PokerCard(c['rank'], c['suit'], c['color']) for c in game_state['board']]
-            update_board = Div(*board_html, id="board-cards", cls="board-area", hx_swap_oob="true")
-
+            board_html    = [PokerCard(c['rank'], c['suit'], c['color']) for c in game_state['board']]
+            update_board  = Div(*board_html, id="board-cards", cls="board-area", hx_swap_oob="true")
         elif move == 'raise':
             pot = r.incrby(pot_key, 100)
-            game_state.setdefault('dealer_log', []).append(f"🃏 Dealer: {player_name} raises to $100.")
+            game_state.setdefault('dealer_log', []).append(f"🃏 {player_name} raises $100.")
             player_phrase = f"{player_name} raised $100."
 
         else:
             return
-
-        bot_folded = game_state.get('bot_folded', {'Toxic Senior': False, 'OOM-Killer': False})
-        for bot_name in ['Toxic Senior', 'OOM-Killer']:
+        bot_folded = game_state.get('bot_folded', {b: False for b in BOT_NAMES})
+        for bot_name in BOT_NAMES:
             if bot_folded.get(bot_name):
                 continue
             bot_cards   = game_state.get('hands', {}).get(bot_name, [])
             board_cards = game_state.get('board', [])
-            bot_result  = engine.bot_decide_move(bot_name, bot_cards, board_cards, pot, 50)
-
-            if bot_result['move'] == 'fold':
+            result      = engine.bot_decide_move(bot_name, bot_cards, board_cards, pot, 50)
+            if result['move'] == 'fold':
                 bot_folded[bot_name] = True
-                game_state['dealer_log'].append(f"🃏 Dealer: {bot_name} folds.")
-            elif bot_result['move'] == 'raise':
+                game_state['dealer_log'].append(f"🃏 {bot_name} folds.")
+            elif result['move'] == 'raise':
                 pot = r.incrby(pot_key, 100)
-                game_state['dealer_log'].append(f"🃏 Dealer: {bot_name} raises to $100.")
+                game_state['dealer_log'].append(f"🃏 {bot_name} raises $100.")
             else:
                 pot = r.incrby(pot_key, 50)
-                game_state['dealer_log'].append(f"🃏 Dealer: {bot_name} calls.")
-
-            bot_phrases.append((bot_name, bot_result['phrase']))
-
+                game_state['dealer_log'].append(f"🃏 {bot_name} calls.")
+            bot_phrases.append((bot_name, result['phrase']))
         game_state['bot_folded'] = bot_folded
         game_state['dealer_log'] = game_state['dealer_log'][-10:]
         r.set(state_key, json.dumps(game_state))
-
-        update_pot = Div(
-            f"POT: ${r.get(pot_key)}",
-            id="pot-display", cls="pot-display", hx_swap_oob="true"
-        )
-        update_phase = Div(
-            game_state.get('phase', 'preflop').upper(),
-            cls="phase-badge", id="phase-badge", hx_swap_oob="true"
-        )
-        log_entries = game_state.get('dealer_log', [])
-        update_dealer_log = Div(
+        current_phase = game_state.get('phase', 'preflop')
+        update_pot    = Div(f"POT: ${r.get(pot_key)}", id="pot-display", cls="pot-display", hx_swap_oob="true")
+        update_phase  = Div(current_phase.upper(), cls="phase-badge", id="phase-badge", hx_swap_oob="true")
+        update_log    = Div(
             Div("DEALER LOG", cls="dealer-log-title"),
-            *[Div(e, cls="dealer-log-entry") for e in log_entries],
+            *[Div(e, cls="dealer-log-entry") for e in game_state.get('dealer_log', [])],
             id="dealer-log", cls="dealer-log", hx_swap_oob="true"
         )
-
-        chat_children = [
-            Div(
-                Div(f"{player_name}:", style="color:#d4af37;font-size:11px;font-family:Cinzel,serif;letter-spacing:1px;"),
-                player_phrase,
-                cls="msg-player"
+        if current_phase == 'showdown':
+            new_buttons = Div(
+                Div(Button("NEW ROUND 🔄", type="submit",
+                           onclick="document.getElementById('move-input').value='restart'",
+                           cls="action-btn btn-new-round"), cls="action-bar"),
+                id="action-buttons-wrap", hx_swap_oob="true"
             )
-        ]
+        else:
+            new_buttons = Div(
+                Div(
+                    Button("FOLD",  type="submit", onclick="document.getElementById('move-input').value='fold'",  cls="action-btn btn-fold"),
+                    Button("CALL",  type="submit", onclick="document.getElementById('move-input').value='call'",  cls="action-btn btn-call"),
+                    Button("RAISE", type="submit", onclick="document.getElementById('move-input').value='raise'", cls="action-btn btn-raise"),
+                    cls="action-bar"
+                ),
+                id="action-buttons-wrap", hx_swap_oob="true"
+            )
+
+        chat_items = [Div(
+            Div(f"{player_name}:", style="color:#d4af37;font-size:11px;font-family:Cinzel,serif;"),
+            player_phrase, cls="msg-player"
+        )]
         for bot_name, phrase in bot_phrases:
-            chat_children.append(Div(
+            chat_items.append(Div(
                 Div(f"{bot_name}:", style="color:#ef9a9a;font-size:11px;"),
-                phrase,
-                cls="msg-bot"
+                phrase, cls="msg-bot"
             ))
-
-        chat_update = Div(*chat_children, id="chat-messages", hx_swap_oob="beforeend")
-
-        parts = [to_xml(update_pot), to_xml(update_phase), to_xml(update_dealer_log), to_xml(chat_update)]
+        chat_update = Div(*chat_items, id="chat-messages", hx_swap_oob="beforeend")
+        parts = [
+            to_xml(update_pot),
+            to_xml(update_phase),
+            to_xml(update_log),
+            to_xml(new_buttons),
+            to_xml(chat_update),
+        ]
         if update_board:
             parts.append(to_xml(update_board))
 
         await broadcast_to_hub(hub_id, "".join(parts))
-
     except Exception as e:
         print(f"[WS ERROR] {e}")
 

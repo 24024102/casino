@@ -3,6 +3,8 @@ import json
 from collections import Counter
 SUITS = ['♠', '♥', '♦', '♣']
 RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']
+BOT_NAMES = ['Toxic Senior', 'OOM-Killer']
+RANK_VALUES = {r: i for i, r in enumerate(RANKS)}
 
 
 TOXIC_FOLD = [
@@ -43,16 +45,15 @@ def deal_preflop(live_player_names):
     hands = {}
     for name in live_player_names:
         hands[name] = [deck.pop(), deck.pop()]
-    hands['bot_oom'] = [deck.pop(), deck.pop()]
-    hands['toxic_senior'] =  [deck.pop(), deck.pop()]
+    for bot in BOT_NAMES:
+        hands[bot] = [deck.pop(), deck.pop()]
     return {
         'hands': hands,
         'board': [],
         'deck': deck,
         'phase': 'preflop',
-        'bot_folded': {'Toxic Senior': False, 'OOM-Killer': False},  
-        'dealer_log': ["Dealer: Cards have been dealt. Preflop begins!"]  
-
+        'bot_folded': {b: False for b in BOT_NAMES},
+        'dealer_log': ['🃏 Dealer: Cards have been dealt. Preflop begins!'],
     }
 def deal_next_phase(game_state):
     deck = game_state['deck']
