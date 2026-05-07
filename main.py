@@ -352,28 +352,26 @@ def reset_betting_round(state):
 SMALL_BLIND = 50
 BIG_BLIND = 100
 MAX_RAISES_PER_STREET = 1
-def pay_to_pot(state, player,amount):
-    amount = max(0,int(amount))
-    chips = state.setdefault('chips',{}.setdefault(player, 1000))
+def pay_to_pot(state, player, amount):
+    amount = max(0, int(amount))
+    chips_map = state.setdefault('chips', {})
+    chips = int(chips_map.get(player, 1000))
     paid = min(chips, amount)
-    state['chips']['player'] = chips - paid
+    chips_map[player] = chips - paid
     state['pot'] = int(state.get('pot', 0)) + paid
     state.setdefault('street_bets', {}).setdefault(player, 0)
     state['street_bets'][player] += paid
-
+    return paid
 def new_game_state(humans, previous_dealer=None):
     humans = list(dict.fromkeys([p for p in humans if p and p not in BOT_NAMES]))
     state = engine.deal_preflop(humans)
     players = list(state.get('hands', {}).keys())
-
     dealer_i = 0
     if previous_dealer in players:
         dealer_i = (players.index(previous_dealer) + 1) % len(players)
-
     dealer = players[dealer_i]
     sb = players[(dealer_i + 1) % len(players)]
     bb = players[(dealer_i + 2) % len(players)]
-
     state['pot'] = 0
     state['chips'] = {p: 1000 for p in players}
     state['folded'] = {p: False for p in players}
@@ -661,21 +659,10 @@ async def ws_action(data: dict, send, hub_id: str, player_name: str):
         return
     if player_name != state.get('current_turn'):
      return ActionButtons(player_name, state, oob=True)
-    state['dealer_log'] = state['dealer_log'][-10:]
-    save_state(hub_id, state)
     apply_move_to_state(state, player_name, move)
     await run_bot_turns(state)
-    board_cards = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('board', [])]
-    return (
-        Div(state.get('phase', 'preflop').upper(), cls="phase-badge", id="phase-badge", hx_swap_oob="true"),
-        Div(*render_player_slots(state, player_name), id="players-row", cls="players-row", hx_swap_oob="true"),
-        Div(f"POT: ${state.get('pot', 0)}", id="pot-display", cls="pot-display", hx_swap_oob="true"),
-        Div(*board_cards, id="board-cards", cls="board-area", hx_swap_oob="true"),
-        Div(Div("DEALER LOG", cls="dealer-log-title"),
-            *[Div(e, cls="dealer-log-entry") for e in state.get('dealer_log', [])],
-            id="dealer-log", cls="dealer-log", hx_swap_oob="true"),
-        ActionButtons(player_name, state, oob=True),
-    )
-
+    state['dealer_log'] = state['dealer_log'][-10:]
+    save_state(hub_id, state)
+    return table_update(state, player_name)
 if __name__ == '__main__':
     serve(host='0.0.0.0', port=5001)
