@@ -615,26 +615,15 @@ async def ws_action(data: dict, send, hub_id: str, player_name: str):
     save_state(hub_id, state)
     apply_move_to_state(state, player_name, move)
     await run_bot_turns(state)
-    if len(active_players(state)) <= 1:
-        state['phase'] = 'showdown'
-        state['current_turn'] = None
-    else:
-        nxt = first_player_needing_action(state, after=player_name)
-        if nxt:
-            state['current_turn'] = nxt
-        elif state['phase'] == 'river':
-            state['phase'] = 'showdown'
-            state['current_turn'] = None
-            state['dealer_log'].append("🃏 Dealer: SHOWDOWN!")
-        else:
-            engine.deal_next_phase(state)
-            reset_betting_round(state)
-
+    if move not in ('fold', 'call', 'raise'):
+        return
+    apply_move_to_state(state, player_name, move)
+    await run_bot_turns(state)
     state['dealer_log'] = state['dealer_log'][-10:]
     save_state(hub_id, state)
-
+    state['dealer_log'] = state['dealer_log'][-10:]
+    save_state(hub_id, state)
     board_cards = [PokerCard(c['rank'], c['suit'], c['color']) for c in state.get('board', [])]
-
     return (
         Div(state.get('phase', 'preflop').upper(), cls="phase-badge", id="phase-badge", hx_swap_oob="true"),
         Div(*render_player_slots(state, player_name), id="players-row", cls="players-row", hx_swap_oob="true"),
