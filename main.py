@@ -183,7 +183,29 @@ casino_style = Style("""
     .player-name { font-size: 13px; color: #aaa; margin-bottom: 4px; }
     .player-chips { font-family: 'Cinzel', serif; color: var(--gold); font-size: 15px; font-weight: 700; }
     .player-status { font-size: 10px; color: rgba(255,255,255,0.3); margin-top: 3px; letter-spacing: 1px; }
+    .dealer-chip {
+        position: absolute;
+        top: -10px;
+        right: -10px;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #f5f5f5;
+        color: #111;
+        border: 2px solid var(--gold);
+        font-family: 'Cinzel', serif;
+        font-size: 12px;
+        font-weight: 900;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
 
+    .action-btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+        filter: grayscale(0.4);
+    }
     .pot-display {
         font-family: 'Cinzel', serif; font-size: 26px; font-weight: 900;
         color: var(--gold); text-shadow: 0 0 20px rgba(212,175,55,0.5);
@@ -397,6 +419,7 @@ def new_game_state(humans, previous_dealer=None):
 
 def render_player_slots(state, viewer=None):
     slots = []
+    dealer = state.get('dealer_button')
     for p in state.get('hands', {}):
         folded = state.get('folded', {}).get(p, False)
         if folded:
@@ -409,12 +432,19 @@ def render_player_slots(state, viewer=None):
             status = "BOT"
         else:
             status = "WAITING"
-        slots.append(Div(
+        children = []
+        if p == dealer:
+            children.append(Div("D", cls="dealer-chip"))
+        children += [
             Div(("🤖 " if p in BOT_NAMES else "👤 ") + p, cls="player-name"),
             Div(f"${state.get('chips', {}).get(p, 1000):,}", cls="player-chips"),
             Div(status, cls="player-status"),
+        ]
+        slots.append(Div(
+            *children,
             cls=f"player-seat {'bot-seat' if p in BOT_NAMES else ''} {'active' if p == state.get('current_turn') else ''}"
         ))
+
     return slots
 def advance_turn_after_action(state, after_player):
     if len(active_players(state)) <= 1:
@@ -456,26 +486,35 @@ def apply_move_to_state(state, player_name, move, phrase=None):
     if phrase:
         state['dealer_log'].append(f"💬 {phrase}")
     advance_turn_after_action(state, player_name)
-async def run_bot_turns(state):
+def bot_take_turn(state):
+    bot_name = state.get('current_turn')
+    if bot_name not in BOT_NAMES:
+        return
+    needed = max(0, state['current_bet'] - state['street_bets'].get(bot_name, 0))
+    result = engine.bot_decide_move(
+        bot_name,
+        state.get('hands', {}).get(bot_name, []),
+        state.get('board', []),
+        state.get('pot', 0),
+        needed
+    )
+    move = result.get('move', 'call')
+    if needed == 0 and move == 'fold':
+        move = 'call'
+    if move not in ('fold', 'call', 'raise'):
+        move = 'call'
+    apply_move_to_state(state, bot_name, move, result.get('phrase'))
+def run_bot_turns_now(state):
     while state.get('phase') != 'showdown' and state.get('current_turn') in BOT_NAMES:
-        bot_name = state['current_turn']
+        bot_take_turn(state)
+async def run_bot_turns(state, send=None, player_name=None, hub_id=None):
+    while state.get('phase') != 'showdown' and state.get('current_turn') in BOT_NAMES:
         await asyncio.sleep(BOT_THINK_SECONDS)
-        needed = max(0, state['current_bet'] - state['street_bets'].get(bot_name, 0))
-        result = engine.bot_decide_move(
-            bot_name,
-            state.get('hands', {}).get(bot_name, []),
-            state.get('board', []),
-            state.get('pot', 0),
-            needed
-        )
-        move = result.get('move', 'call')
-        if needed == 0 and move == 'fold':
-            move = 'call'
-
-        if move not in ('fold', 'call', 'raise'):
-            move = 'call'
-        apply_move_to_state(state, bot_name, move, result.get('phrase'))
-
+        bot_take_turn(state)
+        if hub_id:
+            save_state(hub_id, state)
+        if send and player_name:
+            await send("".join(to_xml(x) for x in table_update(state, player_name)))
 @rt('/login')
 def post(session, nickname: str, room_choice: str): 
     session['nickname'] = nickname
@@ -648,6 +687,7 @@ async def ws_action(data: dict, send, hub_id: str, player_name: str):
         humans = [p for p in state.get('hands', {}) if p not in BOT_NAMES]
         humans += state.get('waiting_players', [])
         state = new_game_state(humans, previous_dealer=state.get('dealer_button'))
+        await run_bot_turns(state, send, player_name, hub_id)
         save_state(hub_id, state)
         return table_update(state, player_name)
 
@@ -660,7 +700,7 @@ async def ws_action(data: dict, send, hub_id: str, player_name: str):
     if player_name != state.get('current_turn'):
      return ActionButtons(player_name, state, oob=True)
     apply_move_to_state(state, player_name, move)
-    await run_bot_turns(state)
+    await run_bot_turns(state, send, player_name, hub_id)
     state['dealer_log'] = state['dealer_log'][-10:]
     save_state(hub_id, state)
     return table_update(state, player_name)
