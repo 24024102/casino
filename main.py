@@ -302,7 +302,7 @@ def PokerCard(rank, suit, color_class):
 def CardBack():
     return Div("🂠", cls="card-back")
 RAISE_AMOUNT = 100
-BOT_THINK_SECONDS = 0.8
+BOT_THINK_SECONDS = 2.2
 def ActionButtons(player_name, state, oob=False):
     attrs = {"cls": "action-bar", "id": "action-buttons-wrap"}
     if oob:
@@ -424,8 +424,10 @@ def render_player_slots(state, viewer=None):
         folded = state.get('folded', {}).get(p, False)
         if folded:
             status = "FOLDED"
+        elif p == state.get('thinking_bot'):
+            status = "THINKING..."
         elif p == state.get('current_turn'):
-            status = "TURN"
+             status = "TURN"
         elif p == viewer:
             status = "YOU"
         elif p in BOT_NAMES:
@@ -468,12 +470,12 @@ def apply_move_to_state(state, player_name, move, phrase=None):
     if move == 'fold':
         state['folded'][player_name] = True
         state['acted'][player_name] = True
-        state['dealer_log'].append(f"🃏 {player_name} folds.")
+        state['dealer_log'].append(f" {player_name} folds.")
     elif move == 'call':
         needed = max(0, state['current_bet'] - state['street_bets'].get(player_name, 0))
         paid = pay_to_pot(state, player_name, needed)
         state['acted'][player_name] = True
-        state['dealer_log'].append(f"🃏 {player_name} {'checks' if paid == 0 else f'calls ${paid}'}.")
+        state['dealer_log'].append(f" {player_name} {'checks' if paid == 0 else f'calls ${paid}'}.")
     elif move == 'raise':
         if state.get('raises_this_street', 0) >= MAX_RAISES_PER_STREET:
             return apply_move_to_state(state, player_name, 'call', phrase)
@@ -482,9 +484,9 @@ def apply_move_to_state(state, player_name, move, phrase=None):
         paid = pay_to_pot(state, player_name, needed)
         state['acted'][player_name] = True
         state['raises_this_street'] = state.get('raises_this_street', 0) + 1
-        state['dealer_log'].append(f"🃏 {player_name} raises +${RAISE_AMOUNT}.")
+        state['dealer_log'].append(f" {player_name} raises +${RAISE_AMOUNT}.")
     if phrase:
-        state['dealer_log'].append(f"💬 {phrase}")
+        state['dealer_log'].append(f" {phrase}")
     advance_turn_after_action(state, player_name)
 def bot_take_turn(state):
     bot_name = state.get('current_turn')
@@ -508,13 +510,15 @@ def run_bot_turns_now(state):
     while state.get('phase') != 'showdown' and state.get('current_turn') in BOT_NAMES:
         bot_take_turn(state)
 async def run_bot_turns(state, send=None, player_name=None, hub_id=None):
-    while state.get('phase') != 'showdown' and state.get('current_turn') in BOT_NAMES:
-        await asyncio.sleep(BOT_THINK_SECONDS)
-        bot_take_turn(state)
-        if hub_id:
-            save_state(hub_id, state)
-        if send and player_name:
-            await send("".join(to_xml(x) for x in table_update(state, player_name)))
+   while state.get('phase') != 'showdown' and state.get('current_turn') in BOT_NAMES:
+    bot_name = state.get('current_turn')
+    state['thinking_bot'] = bot_name
+    if send and player_name:
+        await send("".join(to_xml(x) for x in table_update(state, player_name)))
+    await asyncio.sleep(BOT_THINK_SECONDS)
+    state.pop('thinking_bot', None)
+    bot_take_turn(state)
+
 @rt('/login')
 def post(session, nickname: str, room_choice: str): 
     session['nickname'] = nickname
