@@ -5,6 +5,7 @@ import redis
 import engine
 import json
 from urllib.parse import quote, unquote
+from itertools import combinations
 
 
 hub_name = os.getenv('HUB_NAME', 'Unknown Hub')
@@ -13,7 +14,7 @@ app, rt = fast_app(
     secret_key=os.getenv("SESSION_SECRET", "dev-only-fallback"),
     exts='ws'
 )
-
+HAND_RANKS = {}
 hub_connections = {}
 
 send_to_player  = {}   
@@ -303,6 +304,9 @@ def CardBack():
     return Div("🂠", cls="card-back")
 RAISE_AMOUNT = 100
 BOT_THINK_SECONDS = 2.2
+SMALL_BLIND = 50
+BIG_BLIND = 100
+MAX_RAISES_PER_STREET = 1
 def ActionButtons(player_name, state, oob=False):
     attrs = {"cls": "action-bar", "id": "action-buttons-wrap"}
     if oob:
@@ -404,6 +408,9 @@ def new_game_state(humans, previous_dealer=None):
     state['dealer_button'] = dealer
     state['waiting_players'] = []
     state['winners'] = []
+    state['winners'] = []
+    state['winning_hand'] = None
+    state['pot_paid'] = False
 
     pay_to_pot(state, sb, SMALL_BLIND)
     pay_to_pot(state, bb, BIG_BLIND)
@@ -422,12 +429,14 @@ def render_player_slots(state, viewer=None):
     dealer = state.get('dealer_button')
     for p in state.get('hands', {}):
         folded = state.get('folded', {}).get(p, False)
-        if folded:
+        if p in state.get('winners', []):
+            status = "WINNER"
+        elif folded:
             status = "FOLDED"
         elif p == state.get('thinking_bot'):
             status = "THINKING..."
         elif p == state.get('current_turn'):
-             status = "TURN"
+            status = "TURN"
         elif p == viewer:
             status = "YOU"
         elif p in BOT_NAMES:
@@ -446,22 +455,45 @@ def render_player_slots(state, viewer=None):
             *children,
             cls=f"player-seat {'bot-seat' if p in BOT_NAMES else ''} {'active' if p == state.get('current_turn') else ''}"
         ))
-
     return slots
+def finish_hand(state):
+    if state.get('pot_paid'):
+        return
+    state['phase'] = 'showdown'
+    state['current_turn'] = None
+    active = active_players(state)
+    pot = int(state.get('pot', 0))
+    if len(active) == 1:
+        winners = active
+        winning_label = "everyone else folded"
+    else:
+        scores = {
+            p: engine.best_hand(state.get('hands', {}).get(p, []) + state.get('board', []))
+            for p in active
+        }
+        best_score = max(scores.values())
+        winners = [p for p, score in scores.items() if score == best_score]
+        winning_label = engine.hand_name(best_score)
+    state['winners'] = winners
+    state['winning_hand'] = winning_label
+    share = pot // max(1, len(winners))
+    remainder = pot % max(1, len(winners))
+    for i, winner in enumerate(winners):
+        state['chips'][winner] = int(state['chips'].get(winner, 1000)) + share + (remainder if i == 0 else 0)
+    state['pot_paid'] = True
+    state['dealer_log'].append(
+        f" Winner: {', '.join(winners)} wins ${pot} with {winning_label}."
+    )
 def advance_turn_after_action(state, after_player):
     if len(active_players(state)) <= 1:
-        state['phase'] = 'showdown'
-        state['current_turn'] = None
-        state['dealer_log'].append(f"Dealer:{active_players(state)[0]}wins")
+        finish_hand(state)
         return
     nxt = first_player_needing_action(state, after=after_player)
     if nxt:
         state['current_turn'] = nxt
         return
     if state.get('phase') == 'river':
-        state['phase'] = 'showdown'
-        state['current_turn'] = None
-        state['dealer_log'].append("Dealer:SHOWDOWN")
+        finish_hand(state)
     else:
         engine.deal_next_phase(state)
         reset_betting_round(state)
