@@ -14,7 +14,6 @@ app, rt = fast_app(
     secret_key=os.getenv("SESSION_SECRET", "dev-only-fallback"),
     exts='ws'
 )
-HAND_RANKS = {}
 hub_connections = {}
 
 send_to_player  = {}   
@@ -595,7 +594,7 @@ async def run_bot_turns(state, send=None, player_name=None, hub_id=None):
         if hub_id:
             save_state(hub_id, state)
         if send and player_name:
-            await send("".join(to_xml(x) for x in table_update(state, player_name)))
+            await send("".join(to_xml(x) for x in sync_update(state, player_name)))
         await asyncio.sleep(BOT_THINK_SECONDS)
         state.pop('thinking_bot', None)
         bot_take_turn(state)
@@ -603,7 +602,7 @@ async def run_bot_turns(state, send=None, player_name=None, hub_id=None):
         if hub_id:
             save_state(hub_id, state)
         if send and player_name:
-            await send("".join(to_xml(x) for x in table_update(state, player_name)))
+            await send("".join(to_xml(x) for x in sync_update(state, player_name)))
 
 @rt('/login')
 def post(session, nickname: str, room_choice: str): 
@@ -727,7 +726,7 @@ def get(session):
         Div(
             id="table-sync-poller",
             hx_get=f"/sync/{room}/{quote(nickname, safe='')}",
-            hx_trigger="load, every 2s",
+            hx_trigger="load, every 4s",
             hx_swap="none"
         ),
         Div(
@@ -775,6 +774,16 @@ def table_update(state, player_name):
             id="dealer-log", cls="dealer-log", hx_swap_oob="true"),
         ActionButtons(player_name, state, oob=True),
     )
+def sync_update(state, player_name):
+    return (
+        Div(state.get('phase', 'preflop').upper(), cls="phase-badge", id="phase-badge", hx_swap_oob="true"),
+        Div(*render_player_slots(state, player_name), id="players-row", cls="players-row", hx_swap_oob="true"),
+        Div(f"POT: ${state.get('pot', 0)}", id="pot-display", cls="pot-display", hx_swap_oob="true"),
+        Div(Div("DEALER LOG", cls="dealer-log-title"),
+            *[Div(e, cls="dealer-log-entry") for e in state.get('dealer_log', [])],
+            id="dealer-log", cls="dealer-log", hx_swap_oob="true"),
+        ActionButtons(player_name, state, oob=True),
+    )
 @rt('/sync/{room}/{player_name}')
 def get(room: str, player_name: str):
     player_name = unquote(player_name)
@@ -786,7 +795,7 @@ def get(room: str, player_name: str):
     cleanup_absent_players(room, state)
     state['dealer_log'] = state.get('dealer_log', [])[-10:]
     save_state(room, state)
-    return table_update(state, player_name)
+    return sync_update(state, player_name)
     
 @app.ws('/ws/hub/{hub_id}/{player_name}')
 async def ws_action(data: dict, send, hub_id: str, player_name: str):
