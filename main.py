@@ -382,14 +382,21 @@ def get(session):
     log_entries   = state.get('dealer_log', ['🃏 Dealer: Welcome to the table.'])
     if phase == 'showdown':
         action_buttons = Div(
-            Button("NEW ROUND 🔄", type="button", ws_send=True, hx_vals={"move": "restart", "player": nickname}, cls="action-btn btn-new-round"),
+            Form(
+                Input(type="hidden", name="player", value=nickname), Input(type="hidden", name="move", value="restart"),
+                Button("NEW ROUND 🔄", type="submit", cls="action-btn btn-new-round"),
+                ws_send=True, cls="action-form"
+            ),
             cls="action-bar", id="action-buttons-wrap"
         )
     else:
         action_buttons = Div(
-            Button("FOLD",  type="button", ws_send=True, hx_vals={"move": "fold", "player": nickname}, cls="action-btn btn-fold"),
-            Button("CALL",  type="button", ws_send=True, hx_vals={"move": "call", "player": nickname}, cls="action-btn btn-call"),
-            Button("RAISE", type="button", ws_send=True, hx_vals={"move": "raise", "player": nickname}, cls="action-btn btn-raise"),
+            Form(Input(type="hidden", name="player", value=nickname), Input(type="hidden", name="move", value="fold"), 
+                 Button("FOLD", type="submit", cls="action-btn btn-fold"), ws_send=True, cls="action-form"),
+            Form(Input(type="hidden", name="player", value=nickname), Input(type="hidden", name="move", value="call"), 
+                 Button("CALL", type="submit", cls="action-btn btn-call"), ws_send=True, cls="action-form"),
+            Form(Input(type="hidden", name="player", value=nickname), Input(type="hidden", name="move", value="raise"), 
+                 Button("RAISE", type="submit", cls="action-btn btn-raise"), ws_send=True, cls="action-form"),
             cls="action-bar", id="action-buttons-wrap"
         )
     top_nav = Div(
