@@ -411,20 +411,7 @@ def get(session):
         Div("Playing as: ", Span(nickname), cls="nav-profile"),
         cls="top-nav"
     )
-    player_slots = []
-    for p in state.get('hands', {}).keys():
-        is_me = "active" if p == nickname else ""
-        title = "YOU" if p == nickname else "PLAYER"
-        if p in ('Toxic Senior', 'OOM-Killer'): title = "BOT"
-        
-        player_slots.append(
-            Div(
-                Div(f"👤 {p}", style="font-size: 12px; color: #aaa;"), 
-                Div("$1000", style="font-weight: bold; color: #fff;"), 
-                Div(title, style="font-size:10px; color:#666;"), 
-                cls=f"player-seat {is_me}"
-            )
-        ) 
+    
     return Html(
         Head(
             Title(f"{room} — High Stakes"),
@@ -466,19 +453,49 @@ def get(session):
     )
 
         
-    
+def parse_ws_form(msg):
+    if isinstance(msg, bytes):
+        msg = msg.decode()
+
+    msg = (msg or "").strip()
+    if not msg:
+        return {}
+
+    try:
+        data = json.loads(msg)
+
+        if isinstance(data, dict) and isinstance(data.get("body"), dict):
+            data = data["body"]
+
+        return data if isinstance(data, dict) else {}
+
+    except (json.JSONDecodeError, TypeError):
+        parsed = parse_qs(msg)
+        return {k: v[0] if isinstance(v, list) and v else v for k, v in parsed.items()}
+
+
+def ws_value(data, key, default=""):
+    value = data.get(key, default)
+    if isinstance(value, list):
+        return value[0] if value else default
+    return default if value is None else str(value)    
         
 
 
 @app.ws('/ws/hub/{hub_id}')
 async def ws_action(msg: str, send, hub_id: str):
-    data = parse_qs(msg)
-    move = data.get('move', [''])[0]
-    player_name = data.get('player', ['Anonymous'])[0]
+    if isinstance(msg, bytes):
+        msg = msg.decode()
+
     if hub_id not in hub_connections:
         hub_connections[hub_id] = []
     if send not in hub_connections[hub_id]:
         hub_connections[hub_id].append(send)
+
+    data = parse_ws_form(msg)
+    move = ws_value(data, 'move')
+    player_name = ws_value(data, 'player', 'Anonymous')
+
     if not msg or msg.strip() == '':
         nickname = send_to_player.pop(send, None)
         if send in hub_connections.get(hub_id, []):
@@ -563,11 +580,15 @@ async def ws_action(msg: str, send, hub_id: str):
             *[Div(e, cls="dealer-log-entry") for e in game_state.get('dealer_log', [])],
             id="dealer-log", cls="dealer-log", hx_swap_oob="true"
         )
-        if current_phase == 'showdown':
+        parts = [
+            to_xml(update_pot),
+            to_xml(update_phase),
+            to_xml(update_log),
+        ]
 
-          new_buttons = Div(
+        if current_phase == 'showdown':
+            new_buttons = Div(
                 Form(
-                    Input(type="hidden", name="player", value=player_name),
                     Input(type="hidden", name="move", value="restart"),
                     Button("NEW ROUND 🔄", type="submit", cls="action-btn"),
                     ws_send=True,
@@ -576,50 +597,8 @@ async def ws_action(msg: str, send, hub_id: str):
                 id="action-buttons-wrap",
                 hx_swap_oob="true"
             )
+            parts.append(to_xml(new_buttons))
 
-        else:
-
-            new_buttons = Div(
-
-                Form(
-                    Input(type="hidden", name="player", value=player_name),
-                    Input(type="hidden", name="move", value="fold"),
-                    Button("FOLD", type="submit", cls="action-btn btn-fold"),
-                    ws_send=True,
-                ),
-
-                Form(
-                    Input(type="hidden", name="player", value=player_name),
-                    Input(type="hidden", name="move", value="call"),
-                    Button("CALL", type="submit", cls="action-btn btn-call"),
-                    ws_send=True,
-                ),
-
-                Form(
-                    Input(type="hidden", name="player", value=player_name),
-                    Input(type="hidden", name="move", value="raise"),
-                    Button("RAISE", type="submit", cls="action-btn btn-raise"),
-                    ws_send=True,
-                ),
-
-                cls="action-bar",
-                id="action-buttons-wrap",
-                hx_swap_oob="true"
-            )
-
-        parts = [
-            to_xml(update_pot),
-            to_xml(update_phase),
-            to_xml(update_log),
-            to_xml(new_buttons),
-        ]
-        parts = [
-            to_xml(update_pot),
-            to_xml(update_phase),
-            to_xml(update_log),
-            to_xml(new_buttons),
-            
-        ]
         if update_board:
             parts.append(to_xml(update_board))
 
