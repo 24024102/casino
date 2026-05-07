@@ -382,14 +382,14 @@ def get(session):
     log_entries   = state.get('dealer_log', ['🃏 Dealer: Welcome to the table.'])
     if phase == 'showdown':
         action_buttons = Div(
-            Button("NEW ROUND 🔄", ws_send=True, hx_vals=json.dumps({"move": "restart", "player": nickname}), cls="action-btn btn-new-round"),
+            Button("NEW ROUND 🔄", type="button", ws_send=True, hx_vals={"move": "restart", "player": nickname}, cls="action-btn btn-new-round"),
             cls="action-bar", id="action-buttons-wrap"
         )
     else:
         action_buttons = Div(
-            Button("FOLD",  ws_send=True, hx_vals=json.dumps({"move": "fold", "player": nickname}), cls="action-btn btn-fold"),
-            Button("CALL",  ws_send=True, hx_vals=json.dumps({"move": "call", "player": nickname}), cls="action-btn btn-call"),
-            Button("RAISE", ws_send=True, hx_vals=json.dumps({"move": "raise", "player": nickname}), cls="action-btn btn-raise"),
+            Button("FOLD",  type="button", ws_send=True, hx_vals={"move": "fold", "player": nickname}, cls="action-btn btn-fold"),
+            Button("CALL",  type="button", ws_send=True, hx_vals={"move": "call", "player": nickname}, cls="action-btn btn-call"),
+            Button("RAISE", type="button", ws_send=True, hx_vals={"move": "raise", "player": nickname}, cls="action-btn btn-raise"),
             cls="action-bar", id="action-buttons-wrap"
         )
     top_nav = Div(
@@ -428,19 +428,21 @@ def get(session):
     Body(
             top_nav,
             Div(
-                Div(
+               Div(
                     Div(phase.upper(), cls="phase-badge", id="phase-badge"),
                     Div(*player_slots, id="players-row", cls="players-row"),
                     Div(f"POT: ${pot}", id="pot-display", cls="pot-display"),
-                    Div(*board_cards,  id="board-cards", cls="board-area"),
-                    Div(*my_hole_cards, cls="my-cards"),
-                    action_buttons,
+                    Div(*board_cards, id="board-cards", cls="board-area"),
+                    Div(
+                        Div(*my_hole_cards, cls="my-cards"),
+                        action_buttons,
+                        cls="my-hand-area"
+                    ),
                     cls="table-felt"
                 ),
                 hx_ext="ws", ws_connect=f"/ws/hub/{room}",
                 cls="table-wood-rim"
             ),
-
             
             Div(
                 Div("DEALER LOG", cls="dealer-log-title"),
@@ -555,20 +557,15 @@ async def ws_action(msg: str, send, hub_id: str):
         )
         if current_phase == 'showdown':
             new_buttons = Div(
-                Div(Button("NEW ROUND 🔄", type="submit",
-                           onclick="document.getElementById('move-input').value='restart'",
-                           cls="action-btn btn-new-round"), cls="action-bar"),
-                id="action-buttons-wrap", hx_swap_oob="true"
+                Button("NEW ROUND 🔄", type="button", ws_send=True, hx_vals={"move": "restart", "player": player_name}, cls="action-btn btn-new-round"),
+                cls="action-bar", id="action-buttons-wrap", hx_swap_oob="true"
             )
         else:
             new_buttons = Div(
-                Div(
-                    Button("FOLD",  type="submit", onclick="document.getElementById('move-input').value='fold'",  cls="action-btn btn-fold"),
-                    Button("CALL",  type="submit", onclick="document.getElementById('move-input').value='call'",  cls="action-btn btn-call"),
-                    Button("RAISE", type="submit", onclick="document.getElementById('move-input').value='raise'", cls="action-btn btn-raise"),
-                    cls="action-bar"
-                ),
-                id="action-buttons-wrap", hx_swap_oob="true"
+                Button("FOLD",  type="button", ws_send=True, hx_vals={"move": "fold", "player": player_name}, cls="action-btn btn-fold"),
+                Button("CALL",  type="button", ws_send=True, hx_vals={"move": "call", "player": player_name}, cls="action-btn btn-call"),
+                Button("RAISE", type="button", ws_send=True, hx_vals={"move": "raise", "player": player_name}, cls="action-btn btn-raise"),
+                cls="action-bar", id="action-buttons-wrap", hx_swap_oob="true"
             )
 
         chat_items = [Div(
