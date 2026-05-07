@@ -437,7 +437,8 @@ def get(session):
     return Html(
         Head(
             Title(f"{room} — High Stakes"),
-            
+            Script(src="https://unpkg.com/htmx.org@2.0.2"),
+            Script(src="https://unpkg.com/htmx-ext-ws@2.0.0/ws.js"),
             chat_script,
             casino_style
         ),
