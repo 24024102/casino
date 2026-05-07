@@ -29,7 +29,7 @@ async def broadcast_to_hub(hub_id, message):
         for d in dead:
            hub_connections[hub_id].remove(d)
            send_to_player.pop(d, None)  
-PLAYER_TIMEOUT_SECONDS = 15
+PLAYER_TIMEOUT_SECONDS = 45
 
 def player_presence_key(room,player):
     return f"room:{room}:presence:{player}"
@@ -583,9 +583,6 @@ def bot_take_turn(state):
     if move not in ('fold', 'call', 'raise'):
         move = 'call'
     apply_move_to_state(state, bot_name, move, result.get('phrase'))
-def run_bot_turns_now(state):
-    while state.get('phase') != 'showdown' and state.get('current_turn') in BOT_NAMES:
-        bot_take_turn(state)
 async def run_bot_turns(state, send=None, player_name=None, hub_id=None):
     while state.get('phase') != 'showdown' and state.get('current_turn') in BOT_NAMES:
         bot_name = state.get('current_turn')
@@ -827,8 +824,8 @@ async def ws_action(data: dict, send, hub_id: str, player_name: str):
     apply_move_to_state(state, player_name, move)
     save_state(hub_id, state)
     await run_bot_turns(state, send, player_name, hub_id)
-    state['dealer_log'] = state['dealer_log'][-10:]
-    save_state(hub_id, state)
+    state = new_game_state(humans, previous_dealer=state.get('dealer_button'))
+    await run_bot_turns(state, send, player_name, hub_id)
     return table_update(state, player_name)
 if __name__ == '__main__':
     serve(host='0.0.0.0', port=5001)
